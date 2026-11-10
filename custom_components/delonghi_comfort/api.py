@@ -1,6 +1,7 @@
 """API client for De'Longhi Comfort devices."""
 
 import asyncio
+import base64
 import json
 import re
 import urllib.parse
@@ -10,17 +11,27 @@ from typing import Any
 import aiohttp
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import (
-    API_KEY,
-    CLIENT_ID,
-    AUTHORIZATION_HEADER,
-    APP_ID,
-    APP_SECRET,
-    BROWSER_USER_AGENT,
-    TOKEN_USER_AGENT,
-    API_USER_AGENT,
-    SDK_BUILD,
+SDK_BUILD = 16650
+
+API_KEY = "3_e5qn7USZK-QtsIso1wCelqUKAK_IVEsYshRIssQ-X-k55haiZXmKWDHDRul2e5Y2"
+
+CLIENT_ID = "1S8q1WJEs-emOB43Z0-66WnL"
+
+CLIENT_SECRET = "lmnceiD0B-4KPNN5ZS6WuWU70j9V5BCuSlz2OPsvHkyLryhMkJkPvKsivfTq3RfNYj8GpCELtOBvhaDIzKcBtg"
+
+AUTHORIZATION_HEADER = (
+    "Basic " + base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 )
+
+APP_ID = "DeLonghiComfort2-mw-id"
+
+APP_SECRET = "DeLonghiComfort2-Yg4miiqiNcf0Or-EhJwRh7ACfBY"
+
+BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/79.0.3945.73 Mobile/15E148 Safari/604.1"
+
+TOKEN_USER_AGENT = "DeLonghiComfort/3 CFNetwork/1568.300.101 Darwin/24.2.0"
+
+API_USER_AGENT = "DeLonghiComfort/5.1.1 (iPhone; iOS 18.2; Scale/3.00)"
 
 # The consent page has used both single and double quotes for this literal.
 _CONSENT_SIG_RE = re.compile(r"""const\s+consentObj2Sig\s*=\s*(["'])(.*?)\1""")
@@ -96,16 +107,11 @@ class DeLonghiAPI:
         params = urllib.parse.parse_qs(query)
         return params.get(param, [None])[0]
 
-    def url_encode(self, value: str) -> str:
-        """URL encode a value."""
-        return urllib.parse.quote(value)
-
     async def authenticate(self) -> bool:
         """Authenticate with the De'Longhi API."""
         async with self._auth_lock:
             self.access_token = await self._get_new_access_token()
         return True
-
     async def _get_new_access_token(self) -> str:
         """Get a new access token through the full authentication flow."""
 
@@ -209,7 +215,7 @@ class DeLonghiAPI:
                     "includeUserInfo": "true",
                     "loginMode": "standard",
                     "lang": self.language,
-                    "riskContext": self.url_encode(risk_context_json),
+                    "riskContext": urllib.parse.quote(risk_context_json),
                     "APIKey": API_KEY,
                     "source": "showScreenSet",
                     "sdk": "js_latest",
@@ -401,39 +407,6 @@ class DeLonghiAPI:
             raise DeLonghiProtocolError("De'Longhi returned an invalid property list")
         return response
 
-    def get_property_value(
-        self, properties: list[dict], property_name: str
-    ) -> Any | None:
-        """Extract a property value from the properties list by property name."""
-        for prop in properties:
-            if "property" in prop and prop["property"]["name"] == property_name:
-                return prop["property"]["value"]
-        return None
-
-    async def set_device_mode(self, dsn: str, mode: int) -> bool:
-        """Set device mode (1=Cooling, 2=Dehumidification, 3=Fan)."""
-        return await self.set_device_property(dsn, "set_device_mode", mode)
-
-    async def set_temperature_setpoint(self, dsn: str, temperature: float) -> bool:
-        """Set temperature setpoint (16-32°C)."""
-        return await self.set_device_property(dsn, "set_temp_setpoint", temperature)
-
-    async def set_status(self, dsn: str, status: int) -> bool:
-        """Set device status (1=ON, 2=OFF)."""
-        return await self.set_device_property(dsn, "set_status", status)
-
-    async def set_silent_mode(self, dsn: str, status: int) -> bool:
-        """Set silent mode (1=ON, 2=OFF)."""
-        return await self.set_device_property(dsn, "set_silent_function", status)
-
-    async def set_humidity_setpoint(self, dsn: str, humidity: int) -> bool:
-        """Set humidity setpoint (0-100%)."""
-        return await self.set_device_property(dsn, "humidity_setpoint", humidity)
-
-    async def set_fan_speed(self, dsn: str, fan_speed: int) -> bool:
-        """Set fan speed (1=Low, 2=Mid, 3=High, 4=Auto)."""
-        return await self.set_device_property(dsn, "set_int_fan_speed", str(fan_speed))
-
     async def _request(
         self, method: str, path: str, data: dict[str, Any] | None = None
     ) -> Any:
@@ -477,10 +450,6 @@ class DeLonghiAPI:
     ) -> dict[str, Any]:
         """Make a POST request to the API."""
         return await self._request("POST", path, data)
-
-    async def set_device_status(self, dsn: str, status: int) -> bool:
-        """Set device status (1=ON, 2=OFF)."""
-        return await self.set_device_property(dsn, "set_device_status", str(status))
 
     async def set_device_property(self, dsn: str, propName: str, value: Any) -> bool:
         """Set a device property by DSN and property name."""

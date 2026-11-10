@@ -53,8 +53,7 @@ class SetupTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await async_setup_entry(self.hass, self.entry))
         self.assertNotIn("test-unknown", "\n".join(logs.output))
         data = self.hass.data["delonghi_comfort"]["test-entry"]
-        self.assertEqual(data["devices"], [heater])
-        self.assertNotIn("coordinators", data)
+        self.assertEqual(set(data), {"heater_coordinators"})
         self.assertEqual(data["heater_coordinators"], [self.coordinator])
         self.coordinator.async_config_entry_first_refresh.assert_awaited_once()
 

@@ -1,23 +1,5 @@
 # Constants for De'Longhi Comfort Integration
-import base64
-
 DOMAIN = "delonghi_comfort"
-
-# API Constants from the original script
-SDK_BUILD = 16650
-
-API_KEY = "3_e5qn7USZK-QtsIso1wCelqUKAK_IVEsYshRIssQ-X-k55haiZXmKWDHDRul2e5Y2"
-CLIENT_ID = "1S8q1WJEs-emOB43Z0-66WnL"
-CLIENT_SECRET = "lmnceiD0B-4KPNN5ZS6WuWU70j9V5BCuSlz2OPsvHkyLryhMkJkPvKsivfTq3RfNYj8GpCELtOBvhaDIzKcBtg"
-AUTHORIZATION_HEADER = (
-    "Basic " + base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
-)
-APP_ID = "DeLonghiComfort2-mw-id"
-APP_SECRET = "DeLonghiComfort2-Yg4miiqiNcf0Or-EhJwRh7ACfBY"
-
-BROWSER_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 13_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/79.0.3945.73 Mobile/15E148 Safari/604.1"
-TOKEN_USER_AGENT = "DeLonghiComfort/3 CFNetwork/1568.300.101 Darwin/24.2.0"
-API_USER_AGENT = "DeLonghiComfort/5.1.1 (iPhone; iOS 18.2; Scale/3.00)"
 
 # Language mappings
 LANGUAGES = {
@@ -98,155 +80,6 @@ LANGUAGES = {
     "vi": "VN",
 }
 
-LANGUAGE_COMMS_KEYS = {
-    "CA": "profiledCommunicationCA",
-    "MX": "profiledCommunicationMXCO",
-    "CO": "profiledCommunicationMXCO",
-    "US": "profiledCommunicationUS",
-    "BR": "profiledCommunicationBR",
-    "CL": "profiledCommunicationCL",
-    "AR": "profiledCommunicationCL",
-    "PE": "profiledCommunicationCL",
-    "ZA": "profiledCommunicationZA",
-    "PT": "profiledCommunicationPT",
-    "ES": "profiledCommunicationES",
-    "GB": "profiledCommunicationGB",
-    "IE": "profiledCommunicationGB",
-    "FR": "profiledCommunicationFR",
-    "NL": "profiledCommunicationNL",
-    "BE": "profiledCommunicationBE",
-    "LU": "profiledCommunicationBE",
-    "DE": "profiledCommunicationDE",
-    "CH": "profiledCommunicationCH",
-    "IT": "profiledCommunicationIT",
-    "MT": "profiledCommunicationHRRSSIBG",
-    "HR": "profiledCommunicationHRRSSIBG",
-    "RS": "profiledCommunicationHRRSSIBG",
-    "SI": "profiledCommunicationHRRSSIBG",
-    "BG": "profiledCommunicationHRRSSIBG",
-    "GR": "profiledCommunicationGR",
-    "RO": "profiledCommunicationRO",
-    "TR": "profiledCommunicationTR",
-    "CZ": "profiledCommunicationCZSKHU",
-    "SK": "profiledCommunicationCZSKHU",
-    "HU": "profiledCommunicationCZSKHU",
-    "AT": "profiledCommunicationAT",
-    "UA": "profiledCommunicationUA",
-    "SE": "profiledCommunicationSEFINODK",
-    "FI": "profiledCommunicationSEFINODK",
-    "NO": "profiledCommunicationSEFINODK",
-    "DK": "profiledCommunicationSEFINODK",
-    "PL": "profiledCommunicationPLEELTLV",
-    "EE": "profiledCommunicationPLEELTLV",
-    "LT": "profiledCommunicationPLEELTLV",
-    "LV": "profiledCommunicationPLEELTLV",
-    "AE": "profiledCommunicationAE",
-    "EG": "profiledCommunicationAE",
-    "IN": "profiledCommunicationAE",
-    "IR": "profiledCommunicationAE",
-    "IL": "profiledCommunicationAE",
-    "SA": "profiledCommunicationAE",
-    "OM": "profiledCommunicationAE",
-    "QA": "profiledCommunicationAE",
-    "BH": "profiledCommunicationAE",
-    "KW": "profiledCommunicationAE",
-    "SG": "profiledCommunicationSG",
-    "MY": "profiledCommunicationMY",
-    "AU": "profiledCommunicationAU",
-    "NZ": "profiledCommunicationNZ",
-    "JP": "profiledCommunicationJP",
-    "KR": "profiledCommunicationKR",
-    "KH": "profiledCommunicationHKBDKHTH",
-    "HK": "profiledCommunicationHKBDKHTH",
-    "BD": "profiledCommunicationHKBDKHTH",
-    "TH": "profiledCommunicationHKBDKHTH",
-    "ID": "profiledCommunicationHKBDKHTH",
-    "PH": "profiledCommunicationHKBDKHTH",
-    "TW": "profiledCommunicationHKBDKHTH",
-    "VN": "profiledCommunicationHKBDKHTH",
-}
-
-LANGUAGE_COUNTRIES = {
-    "en": "United Kingdom",
-    "pt": "Portugal",
-    "en-ca": "Canada",
-    "fr-ca": "Canada",
-    "es-mx": "Mexico",
-    "es-co": "Colombia",
-    "es-pe": "Peru",
-    "en-us": "United States",
-    "pt-br": "Brazil",
-    "es-cl": "Chile",
-    "en-za": "South Africa",
-    "es": "Spain",
-    "fr": "France",
-    "lu": "Luxembourg",
-    "nl": "Netherlands",
-    "my": "Malaysia",
-    "fr-be": "Belgium",
-    "nl-inf": "Belgium",
-    "de": "Germany",
-    "fr-ch": "Switzerland",
-    "de-inf": "Switzerland",
-    "it": "Italy",
-    "mt-mt": "Malta",
-    "en-mt": "Malta",
-    "hr": "Croatia",
-    "sr": "Serbia",
-    "sl": "Slovenia",
-    "br": "Bulgaria",
-    "el": "Greece",
-    "ro": "Romania",
-    "tr": "Turkey",
-    "cs": "Czechia",
-    "sk": "Slovakia",
-    "hu": "Hungary",
-    "de-at": "Austria",
-    "uk": "Ukraine",
-    "sv": "Sweden",
-    "fi": "Finland",
-    "no": "Norway",
-    "da": "Denmark",
-    "pl": "Poland",
-    "et-ee": "Estonia",
-    "lt-lt": "Lithuania",
-    "lv-lv": "Latvia",
-    "en-ae": "United Arab Emirates",
-    "ar-ae": "United Arab Emirates",
-    "en-sg": "Singapore",
-    "en-my": "Malaysia",
-    "en-au": "Australia",
-    "en-nz": "New Zealand",
-    "ja": "Japan",
-    "ko": "South Korea",
-    "en-kh": "Cambodia",
-    "en-hk": "Hong Kong",
-    "en-bd": "Bangladesh",
-    "en-th": "Thailand",
-    "th": "Thailand",
-    "es-ar": "Argentina",
-    "ar-eg": "Egypt",
-    "en-eg": "Egypt",
-    "en-in": "India",
-    "en-ir": "Iran",
-    "fa": "Iran",
-    "en-il": "Israel",
-    "en-sa": "Saudi Arabia",
-    "ar-sa": "Saudi Arabia",
-    "en-ie": "Ireland",
-    "en-id": "Indonesia",
-    "en-ph": "Philippines",
-    "zh-tw": "Taiwan",
-    "en-om": "Oman",
-    "en-qa": "Qatar",
-    "en-bh": "Bahrain",
-    "en-kw": "Kuwait",
-    "vi": "Vietnam",
-}
-
-# Device modes
-DEVICE_MODES = {1: "Cooling", 2: "Dehumidification", 3: "Fan"}
-
 # Configuration keys
 CONF_USERNAME = "username"
 CONF_PASSWORD = "password"
@@ -254,8 +87,6 @@ CONF_LANGUAGE = "language"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 # Default values
-DEFAULT_TEMP_SETPOINT = 23.0
-DEFAULT_DEVICE_MODE = 1  # Cooling mode
 DEFAULT_LANGUAGE = "en"
 
 # Update intervals
