@@ -18,6 +18,9 @@ This project is not advertised as part of the Marketplace default catalog.
 - Unknown models, including previously enabled air conditioners and
   dehumidifiers, are skipped with a warning. An account with no supported devices
   cannot be configured. Existing registrations are not deleted automatically.
+- Legacy non-heater entity implementations and the unused number platform have
+  been removed. Only heater entities are created; adding model support later
+  requires a reviewed implementation rather than re-enabling dormant code.
 - The `delonghi_comfort` domain, account unique IDs and heater entity unique IDs
   remain unchanged. Back up your HA configuration before upgrading.
 - Minimum Home Assistant: **2026.11.0**. Use the latest stable patch release.

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.components.climate import HVACAction, HVACMode
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
+from custom_components.delonghi_comfort import climate, select, sensor, switch
 from custom_components.delonghi_comfort.api import DeLonghiConnectionError
 from custom_components.delonghi_comfort.climate import DeLonghiHeater
 from custom_components.delonghi_comfort.coordinator import (
@@ -68,6 +69,53 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.temperature.native_value, 20.5)
         self.assertTrue(self.switches[0].is_on)
         self.assertFalse(self.switches[1].is_on)
+
+    async def test_platform_setup_creates_only_heater_entities(self):
+        hass = MagicMock()
+        entry = MagicMock()
+        entry.entry_id = "test-entry"
+        hass.data = {
+            "delonghi_comfort": {
+                entry.entry_id: {"heater_coordinators": [self.coordinator]}
+            }
+        }
+        for platform, expected in (
+            (climate, [DeLonghiHeater]),
+            (sensor, [HeaterTemperature]),
+            (select, [HeaterBrightness]),
+            (switch, [HeaterSwitch, HeaterSwitch]),
+        ):
+            with self.subTest(platform=platform.__name__):
+                entities = []
+                await platform.async_setup_entry(hass, entry, entities.extend)
+                self.assertEqual([type(entity) for entity in entities], expected)
+                self.assertTrue(
+                    all(entity.coordinator is self.coordinator for entity in entities)
+                )
+                hass.data["delonghi_comfort"][entry.entry_id]["heater_coordinators"] = []
+                empty_entities = []
+                await platform.async_setup_entry(hass, entry, empty_entities.extend)
+                self.assertEqual(empty_entities, [])
+                hass.data["delonghi_comfort"][entry.entry_id]["heater_coordinators"] = [
+                    self.coordinator
+                ]
+
+    async def test_heater_uses_class_defaults_and_json_icon(self):
+        root = Path(__file__).resolve().parents[1] / "custom_components/delonghi_comfort"
+        icons = json.loads((root / "icons.json").read_text())
+        self.assertIsNone(self.climate.icon)
+        self.assertEqual(
+            icons["entity"]["climate"][self.climate.translation_key]["default"],
+            "mdi:radiator",
+        )
+        for attribute in (
+            "_attr_supported_features", "_attr_has_entity_name", "_attr_name",
+            "_attr_translation_key", "_attr_fan_modes", "_attr_hvac_modes",
+            "_attr_max_temp", "_attr_min_temp", "_attr_preset_modes",
+            "_attr_target_temperature_step", "_attr_native_temperature_unit",
+        ):
+            self.assertIn(attribute, DeLonghiHeater.__dict__)
+            self.assertNotIn(attribute, vars(self.climate))
 
     async def test_missing_and_unknown_values_do_not_crash_or_invent_state(self):
         for value in (None, -1, 999, 1.5, "invalid", [], {}, True, float("nan")):

@@ -69,7 +69,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryError("No supported De'Longhi devices found; only DL-heater is supported")
 
     # Create coordinators for each device
-    coordinators = []
     heater_coordinators = []
     for device in supported_devices:
         device_info = device["device"]
@@ -84,7 +83,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         "api": api,
         "devices": supported_devices,
-        "coordinators": coordinators,
         "heater_coordinators": heater_coordinators,
     }
 
