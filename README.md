@@ -136,6 +136,44 @@ logo or an indication of endorsement.
   identifiers must not be included in logs or issue reports. Even when reporting
   an exception, review it and remove identifying information first.
 
+### Diagnostics and fixture collection
+
+**Attribute migration:** the climate entity no longer copies all raw cloud
+properties into `extra_state_attributes`. Use the normal climate attributes and
+dedicated entities in automations; use diagnostics for property inspection.
+Templates referencing raw attributes such as `device_mode`, `get_eco` or
+`current_power_level` must be updated. Standard `preset_mode`, `fan_mode`,
+temperature and HVAC attributes remain available.
+
+Download diagnostics from the existing De'Longhi Comfort account entry under
+**Settings > Devices & services**. Each request authenticates and fetches all
+devices currently registered to that account, including unsupported models,
+then reads their properties. No device is controlled or registered by diagnostics,
+and unsupported models are not polled during normal operation. An account with
+only unsupported models still cannot be configured.
+
+The integration's diagnostics `data.devices` contains anonymous device indices,
+model information, a `supported` flag and fixture-shaped `properties` lists.
+Credentials, tokens, DSNs, device names, cloud metadata and sensitive properties
+are excluded or redacted. Unknown text values are conservatively redacted;
+numeric values and numeric strings remain, along with model/version text for
+explicitly allowed fields. Do not treat this as a complete raw API response.
+Review the **entire downloaded file**, including HA's surrounding metadata,
+before sharing it or committing extracted fixtures.
+
+A device retrieval failure is recorded as `error` instead of an empty successful
+property list; other devices remain in the output. Authentication/account-wide
+failures abort the download. Diagnostics make additional cloud requests and may
+take up to the API timeout per device; request them only when needed.
+Extract the relevant `properties` list into a reviewed fixture and record its
+model, collection date and validation scope. Downloading diagnostics alone does
+not establish that controls on an unsupported model work.
+
+Japanese UI translations are included. The account's **Language** setting is
+sent to the vendor authentication flow; HA's user-interface language determines
+the local labels. Existing entity unique IDs and raw mode/option values remain
+unchanged. Existing registry names are not forcibly renamed.
+
 Report reproducible problems using the
 [issue tracker](https://github.com/sayurin/delonghi-comfort-integration/issues).
 Include HA/integration versions, the product model, expected/actual behavior and

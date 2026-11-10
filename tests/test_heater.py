@@ -69,6 +69,7 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.temperature.native_value, 20.5)
         self.assertTrue(self.switches[0].is_on)
         self.assertFalse(self.switches[1].is_on)
+        self.assertIsNone(self.climate.extra_state_attributes)
 
     async def test_platform_setup_creates_only_heater_entities(self):
         hass = MagicMock()

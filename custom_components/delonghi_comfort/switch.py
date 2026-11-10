@@ -21,12 +21,12 @@ HEATER_DESCRIPTIONS = (
     SwitchEntityDescription(
         key="eco",
         icon="mdi:sprout",
-        name="Eco",
+        translation_key="eco",
     ),
     SwitchEntityDescription(
         key="lock",
         icon="mdi:lock",
-        name="Child lock",
+        translation_key="lock",
     ),
 )
 
@@ -59,7 +59,6 @@ class HeaterSwitch(CoordinatorEntity, SwitchEntity):
         """Initialize the switch entity."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_translation_key = description.key
         self._attr_unique_id = f"delonghi_heater_{coordinator.dsn}_{description.key}"
         self._attr_device_info = coordinator.get_device_info()
 

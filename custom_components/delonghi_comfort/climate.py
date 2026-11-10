@@ -60,11 +60,6 @@ class DeLonghiHeater(CoordinatorEntity, ClimateEntity):
         self._attr_device_info = coordinator.get_device_info()
 
     @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional state attributes."""
-        return dict(self.coordinator.data)
-
-    @property
     def hvac_mode(self) -> HVACMode | None:
         """Return current operation mode."""
         status = numeric_value(self.coordinator.data.get("device_status"))
