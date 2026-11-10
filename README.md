@@ -152,6 +152,11 @@ then reads their properties. No device is controlled or registered by diagnostic
 and unsupported models are not polled during normal operation. An account with
 only unsupported models still cannot be configured.
 
+The device-specific diagnostics download fetches **only that device's
+properties**, without downloading the account device list or properties of
+other devices. Model/version information comes from HA's device registry;
+the support flag is `null` when the OEM model is not available there.
+
 The integration's diagnostics `data.devices` contains anonymous device indices,
 model information, a `supported` flag and fixture-shaped `properties` lists.
 Credentials, tokens, DSNs, device names, cloud metadata and sensitive properties

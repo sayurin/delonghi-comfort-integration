@@ -7,7 +7,9 @@ from typing import Any
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntry
 
 from .api import (
     DeLonghiAPI,
@@ -20,6 +22,7 @@ from .const import (
     CONF_PASSWORD,
     CONF_USERNAME,
     DEFAULT_LANGUAGE,
+    DOMAIN,
     SUPPORTED_MODELS,
 )
 
@@ -92,10 +95,8 @@ def _redact_properties(
     return result
 
 
-async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
-) -> dict[str, Any]:
-    """Fetch all account devices, including unsupported models, only on request."""
+async def _async_create_api(hass: HomeAssistant, entry: ConfigEntry) -> DeLonghiAPI:
+    """Authenticate a diagnostic session without exposing account data."""
     api = DeLonghiAPI(
         entry.data[CONF_USERNAME],
         entry.data[CONF_PASSWORD],
@@ -103,7 +104,13 @@ async def async_get_config_entry_diagnostics(
         entry.data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
     )
     await api.authenticate()
-    devices = await api.get_devices()
+    return api
+
+
+async def _async_collect_devices(
+    api: DeLonghiAPI, entry: ConfigEntry, devices: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Collect only the supplied devices using the same privacy rules."""
     secrets = tuple(
         value
         for value in (
@@ -124,7 +131,7 @@ async def async_get_config_entry_diagnostics(
                 "index": index,
                 "supported": model in SUPPORTED_MODELS
                 if isinstance(model, str)
-                else False,
+                else None,
                 **{
                     key: _redact_value(device[key], secrets, allow_string=True)
                     for key in ("oem_model", "model", "sw_version")
@@ -148,3 +155,36 @@ async def async_get_config_entry_diagnostics(
             record["properties"] = _redact_properties(properties, secrets)
         diagnostics.append(record)
     return {"devices": diagnostics}
+
+
+async def async_get_config_entry_diagnostics(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> dict[str, Any]:
+    """Fetch all account devices, including unsupported models, only on request."""
+    api = await _async_create_api(hass, entry)
+    return await _async_collect_devices(api, entry, await api.get_devices())
+
+
+async def async_get_device_diagnostics(
+    hass: HomeAssistant, entry: ConfigEntry, device: DeviceEntry
+) -> dict[str, Any]:
+    """Fetch only the selected registered device, without downloading the account list."""
+    dsns = [identifier for domain, identifier in device.identifiers if domain == DOMAIN]
+    if len(dsns) != 1:
+        raise HomeAssistantError(
+            "De'Longhi diagnostic device identifier is missing or ambiguous"
+        )
+    api = await _async_create_api(hass, entry)
+    return await _async_collect_devices(
+        api,
+        entry,
+        [
+            {
+                "device": {
+                    "dsn": dsns[0],
+                    "model": device.model,
+                    "sw_version": device.sw_version,
+                }
+            }
+        ],
+    )

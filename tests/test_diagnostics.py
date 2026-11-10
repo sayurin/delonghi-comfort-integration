@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.components.diagnostics import REDACTED
+from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.delonghi_comfort.api import (
     DeLonghiAuthenticationError,
@@ -14,6 +15,7 @@ from custom_components.delonghi_comfort.api import (
 )
 from custom_components.delonghi_comfort.diagnostics import (
     async_get_config_entry_diagnostics,
+    async_get_device_diagnostics,
 )
 
 MODULE = "custom_components.delonghi_comfort.diagnostics"
@@ -184,6 +186,38 @@ class DiagnosticsTests(unittest.IsolatedAsyncioTestCase):
             await async_get_config_entry_diagnostics(self.hass, self.entry),
             {"devices": []},
         )
+        self.api.get_device_properties.assert_not_awaited()
+
+    async def test_device_diagnostics_never_downloads_account_list_or_other_properties(
+        self,
+    ):
+        device = MagicMock()
+        device.identifiers = {("delonghi_comfort", "fixture-heater")}
+        device.model = "MDHAA15WIFI-BK"
+        device.sw_version = "1.2.3"
+        data = await async_get_device_diagnostics(self.hass, self.entry, device)
+        self.api.get_devices.assert_not_awaited()
+        self.api.get_device_properties.assert_awaited_once_with("fixture-heater")
+        self.assertEqual(len(data["devices"]), 1)
+        self.assertEqual(data["devices"][0]["device"]["model"], "MDHAA15WIFI-BK")
+        self.assertNotIn("fixture-heater", json.dumps(data))
+        self.assertEqual(
+            data["devices"][0]["properties"],
+            [{"property": {"name": "room_temp", "value": "20.5"}}],
+        )
+
+    async def test_device_diagnostics_rejects_missing_or_ambiguous_identifiers(self):
+        device = MagicMock()
+        for identifiers in (
+            set(),
+            {("other", "fixture-heater")},
+            {("delonghi_comfort", "first"), ("delonghi_comfort", "second")},
+        ):
+            device.identifiers = identifiers
+            with self.assertRaises(HomeAssistantError):
+                await async_get_device_diagnostics(self.hass, self.entry, device)
+        self.api.authenticate.assert_not_awaited()
+        self.api.get_devices.assert_not_awaited()
         self.api.get_device_properties.assert_not_awaited()
 
 
