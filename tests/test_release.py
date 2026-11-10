@@ -29,6 +29,8 @@ class ReleaseTests(unittest.TestCase):
         integration.mkdir(parents=True)
         (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
         (integration / "__init__.py").write_text('"""Test integration."""\n')
+        (integration / "translations").mkdir()
+        (integration / "translations/en.json").write_text("{}")
         (integration / "__pycache__").mkdir()
         (integration / "__pycache__/stale.pyc").write_bytes(b"stale")
         for document in release.DOCUMENTS:
@@ -54,22 +56,42 @@ class ReleaseTests(unittest.TestCase):
         with ZipFile(integration) as archive:
             self.assertEqual(
                 set(archive.namelist()),
-                {"delonghi_comfort/__init__.py", "delonghi_comfort/manifest.json"},
+                {"__init__.py", "manifest.json", "translations/en.json"},
             )
             self.assertEqual(
-                json.loads(archive.read("delonghi_comfort/manifest.json"))["version"],
+                json.loads(archive.read("manifest.json"))["version"],
                 "1.2.3",
             )
         with ZipFile(complete) as archive:
             self.assertEqual(
                 set(archive.namelist()),
                 {f"{release.INTEGRATION}/__init__.py",
-                 f"{release.INTEGRATION}/manifest.json", *release.DOCUMENTS},
+                 f"{release.INTEGRATION}/manifest.json",
+                 f"{release.INTEGRATION}/translations/en.json", *release.DOCUMENTS},
             )
             self.assertNotIn("INTEGRATION-REBUILD-PLAN.md", archive.namelist())
         first = integration.read_bytes(), complete.read_bytes()
         release.build_release(self.repository, "v1.2.3", self.output)
         self.assertEqual(first, (integration.read_bytes(), complete.read_bytes()))
+
+    def test_marketplace_asset_configuration_and_direct_extraction(self):
+        manifest = json.loads((SCRIPT.parents[1] / "hacs.json").read_text())
+        integration, _ = release.build_release(
+            self.repository, "v1.2.3", self.output
+        )
+        self.assertIs(manifest["zip_release"], True)
+        self.assertIs(manifest["hide_default_branch"], True)
+        self.assertEqual(manifest["filename"], integration.name)
+        destination = self.root / "config/custom_components/delonghi_comfort"
+        with ZipFile(integration) as archive:
+            archive.extractall(destination)
+        self.assertEqual(
+            json.loads((destination / "manifest.json").read_text())["version"],
+            "1.2.3",
+        )
+        self.assertTrue((destination / "__init__.py").is_file())
+        self.assertTrue((destination / "translations/en.json").is_file())
+        self.assertFalse((destination / "delonghi_comfort").exists())
 
     def test_mismatch_and_invalid_tags_produce_no_artifacts(self):
         self.git("tag", "v1.2.4")

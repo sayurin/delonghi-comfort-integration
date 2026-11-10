@@ -56,7 +56,7 @@ def build_release(repository: Path, tag: str, output: Path) -> tuple[Path, Path]
             info.external_attr = 0o100644 << 16
             complete.writestr(info, content)
             if path.startswith(f"{INTEGRATION}/"):
-                info = ZipInfo(path.removeprefix("custom_components/"))
+                info = ZipInfo(path.removeprefix(f"{INTEGRATION}/"))
                 info.compress_type = ZIP_DEFLATED
                 info.external_attr = 0o100644 << 16
                 integration.writestr(info, content)

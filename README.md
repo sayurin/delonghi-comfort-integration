@@ -12,7 +12,7 @@ approval to maintain its own changes.
 
 **New releases are on hold pending the licensing and API-configuration review
 described below.** A passing CI run does not resolve those questions.
-This project is not advertised as part of the HACS default catalog.
+This project is not advertised as part of the Marketplace default catalog.
 
 - Only devices reporting `oem_model: DL-heater` are initialized.
 - Unknown models, including previously enabled air conditioners and
@@ -82,18 +82,35 @@ fixture-only behavior before being enabled.
 
 ## Installation
 
-For development or an explicitly approved release:
+### Marketplace (published ZIP releases)
 
-1. In HACS, add `https://github.com/sayurin/delonghi-comfort-integration` as a
-   custom repository with category **Integration**.
-2. Install **De'Longhi Comfort** and restart Home Assistant.
+These steps apply only after an approved release has been published. While
+releases are on hold, use the manual/development method below. Draft releases
+are not public installable versions.
+
+1. Open **Marketplace**, then its overflow menu > **Custom repositories**.
+   Add `https://github.com/sayurin/delonghi-comfort-integration` with category
+   **Integration**.
+2. Select **De'Longhi Comfort**, install a published release and restart Home
+   Assistant. Marketplace downloads the release asset `delonghi_comfort.zip`,
+   not a snapshot of the default branch.
 3. Under **Settings > Devices & services**, add **De'Longhi Comfort**.
 4. Enter your account email, password and language.
 
-For manual installation, copy `custom_components/delonghi_comfort` into your
-configuration's `custom_components` directory and restart HA. A release's
-`delonghi_comfort.zip` contains the `delonghi_comfort/` directory; extract that
-directory under `custom_components/`.
+The repository manifest remains named `hacs.json` for Marketplace compatibility.
+It enables ZIP releases, names the exact asset and hides default-branch installs.
+
+### Manual installation and development
+
+From a checkout, copy `custom_components/delonghi_comfort` into your
+configuration's `custom_components` directory. From a published release,
+create `custom_components/delonghi_comfort/` and extract `delonghi_comfort.zip`
+**inside it**: `manifest.json` and `__init__.py` are at the ZIP root, without a
+wrapping directory. Alternatively, the full `delonghi-comfort-integration-v<version>.zip`
+contains `custom_components/delonghi_comfort/` plus README, LICENSE and NOTICE.
+Restart HA, add **De'Longhi Comfort** under **Settings > Devices & services**
+and enter your account details. Workspace development uses the symlink described
+below instead of a copy.
 
 Do not install this copy alongside another integration using the same domain.
 The generic radiator icon is original AI-assisted artwork, not a manufacturer
@@ -145,8 +162,9 @@ commands, existing IDs, and release archives. They never access an account or
 operate a heater. Unit tests do not replace human hardware checks.
 
 CI runs those tests against the minimum HA version and latest stable HA,
-plus official hassfest and HACS validation. HACS validation is a structural
-check, not acceptance into the default catalog or legal clearance.
+plus official hassfest and the legacy-named `hacs/action` repository validator.
+That validator is a structural check, not acceptance into the Marketplace
+default catalog or legal clearance.
 
 ## Releases and unresolved prerequisites
 
@@ -179,6 +197,9 @@ Before any independent release:
    `DELONGHI_RELEASE_APPROVED` to `true`. Until then the release workflow fails
    explicitly without publishing anything. The approved workflow creates a
    **draft** release for final human review, not an automatic public release.
+6. Review both draft assets and publish the approved release manually. Keep
+   `delonghi_comfort.zip` attached with that exact filename for Marketplace;
+   the full archive is for manual installation and attribution review.
 
 The two archives contain only committed integration files and the documented
 license/readme files, not local configuration, test output, bytecode, credentials
