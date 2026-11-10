@@ -24,6 +24,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import numeric_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -209,4 +210,4 @@ class HeaterTemperature(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> Any:
         """Return the value of the sensor."""
-        return self.coordinator.data.get("room_temp")
+        return numeric_value(self.coordinator.data.get("room_temp"))

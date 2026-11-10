@@ -12,6 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import numeric_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -164,24 +165,15 @@ class HeaterSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return True if the switch is on."""
-        value = self.coordinator.data.get(f"get_{self.entity_description.key}")
-        if value is None:
-            return None
-        # Device status: 1 = ON, 0 = OFF
-        return value == 1
+        value = numeric_value(
+            self.coordinator.data.get(f"get_{self.entity_description.key}")
+        )
+        return bool(value) if value in (0, 1) else None
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-        success = await self.coordinator.api.set_device_property(self.coordinator.dsn, f"set_{self.entity_description.key}", 1)
-        if success:
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to turn on: %s", self.entity_description.key)
+        await self.coordinator.async_set_property(f"set_{self.entity_description.key}", 1)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        success = await self.coordinator.api.set_device_property(self.coordinator.dsn, f"set_{self.entity_description.key}", 0)
-        if success:
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to turn off: %s", self.entity_description.key)
+        await self.coordinator.async_set_property(f"set_{self.entity_description.key}", 0)

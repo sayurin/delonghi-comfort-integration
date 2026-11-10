@@ -12,10 +12,12 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import indexed_value, numeric_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,7 +83,7 @@ class DeLonghiClimate(CoordinatorEntity, ClimateEntity):
         # Fan modes - you can adjust these based on your device's capabilities
         self._attr_fan_modes = ["auto", "low", "medium", "high"]
 
-        self._attr_temperature_unit = UnitOfTemperature.CELSIUS
+        self._attr_native_temperature_unit = UnitOfTemperature.CELSIUS
         self._attr_min_temp = 18
         self._attr_max_temp = 32
         self._attr_target_temperature_step = 1
@@ -122,12 +124,12 @@ class DeLonghiClimate(CoordinatorEntity, ClimateEntity):
         return HVACAction.IDLE
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the current temperature."""
         return self.coordinator.data.get("room_temp")
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
         return self.coordinator.data.get("temp_setpoint")
 
@@ -248,7 +250,7 @@ class DeLonghiHeater(CoordinatorEntity, ClimateEntity):
     _attr_min_temp = 10
     _attr_preset_modes = ["Day mode", "Night mode", "Antifrost", "Manual"]
     _attr_target_temperature_step = 0.5
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
 
     def __init__(
         self,
@@ -268,89 +270,86 @@ class DeLonghiHeater(CoordinatorEntity, ClimateEntity):
         return dict(self.coordinator.data)
 
     @property
-    def hvac_mode(self) -> HVACMode:
+    def hvac_mode(self) -> HVACMode | None:
         """Return current operation mode."""
         # Check if device is on/off first
-        status = self.coordinator.data.get("device_status")
-        return HVACMode.HEAT if status == 1 else HVACMode.OFF
+        status = numeric_value(self.coordinator.data.get("device_status"))
+        return {1: HVACMode.HEAT, 2: HVACMode.OFF}.get(status)
 
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current running hvac operation."""
-        status = self.coordinator.data.get("device_status")
+        status = numeric_value(self.coordinator.data.get("device_status"))
         if status == 1:  # ON
-            power_level = self.coordinator.data.get("MDH_Resources")
-            return HVACAction.IDLE if power_level == 0 else HVACAction.HEATING
-        return HVACAction.OFF
+            power_level = numeric_value(self.coordinator.data.get("MDH_Resources"))
+            if power_level == 0:
+                return HVACAction.IDLE
+            if power_level is not None and power_level > 0:
+                return HVACAction.HEATING
+        return HVACAction.OFF if status == 2 else None
 
     @property
     def preset_mode(self) -> str | None:
         """Return the current preset mode."""
-        device_mode = self.coordinator.data.get("device_mode")
-        return self.preset_modes[device_mode-1] if 1 <= device_mode <= 4 else None
+        return indexed_value(
+            self.coordinator.data.get("device_mode"), self.preset_modes, 1
+        )
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the current temperature."""
-        return self.coordinator.data.get("room_temp")
+        return numeric_value(self.coordinator.data.get("room_temp"))
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return the temperature we try to reach."""
-        return self.coordinator.data.get("temperature_setpoint")
+        return numeric_value(self.coordinator.data.get("temperature_setpoint"))
 
     @property
     def fan_mode(self) -> str | None:
         """Return the fan mode."""
-        power_level = self.coordinator.data.get("current_power_level", 0)
-        return self.fan_modes[power_level]
+        return indexed_value(
+            self.coordinator.data.get("current_power_level"), self.fan_modes
+        )
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set new target hvac mode."""
         if hvac_mode == HVACMode.OFF:
             await self.async_turn_off()
-        else:
+        elif hvac_mode == HVACMode.HEAT:
             await self.async_turn_on()
+        else:
+            raise ServiceValidationError("Unsupported heater HVAC mode")
 
     async def async_turn_on(self) -> None:
         """Turn the entity on."""
-        if await self._api.set_device_property(self._dsn, "set_status", 1):  # 1 = ON
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to turn on device")
+        await self.coordinator.async_set_property("set_status", 1)
 
     async def async_turn_off(self) -> None:
         """Turn the entity off."""
-        if await self._api.set_device_property(self._dsn, "set_status", 2):  # 2 = OFF
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to turn off device")
+        await self.coordinator.async_set_property("set_status", 2)
 
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new target preset mode."""
         if preset_mode not in self.preset_modes:
-            _LOGGER.error("Invalid preset mode: %s", preset_mode)
-            return
+            raise ServiceValidationError("Unsupported heater preset mode")
         device_mode = self.preset_modes.index(preset_mode) + 1
-        if await self._api.set_device_property(self._dsn, "set_device_mode", device_mode):
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to set preset mode to %s", preset_mode)
+        await self.coordinator.async_set_property("set_device_mode", device_mode)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new target fan mode."""
+        if fan_mode not in self.fan_modes:
+            raise ServiceValidationError("Unsupported heater power level")
         power_level = self.fan_modes.index(fan_mode)
-        if await self._api.set_device_property(self._dsn, "set_power_level", power_level):
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to set fan mode to %s", fan_mode)
+        await self.coordinator.async_set_property("set_power_level", power_level)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set new target temperature."""
-        temperature = kwargs.get(ATTR_TEMPERATURE)
-        if temperature is None:
-            return
-        if await self._api.set_device_property(self._dsn, "temperature_setpoint", float(temperature)):
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to set temperature setpoint")
+        temperature = numeric_value(kwargs.get(ATTR_TEMPERATURE))
+        if (
+            temperature is None
+            or not self.min_temp <= temperature <= self.max_temp
+            or temperature % self.target_temperature_step
+        ):
+            raise ServiceValidationError("Heater temperature must be 10-28 C in 0.5 C steps")
+        await self.coordinator.async_set_property("temperature_setpoint", temperature)

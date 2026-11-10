@@ -7,10 +7,12 @@ import logging
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import indexed_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,17 +131,14 @@ class HeaterBrightness(CoordinatorEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current option."""
-        value = self.coordinator.data.get(f"current_brightness")
-        return None if value is None else self.options[value - 1]
+        return indexed_value(
+            self.coordinator.data.get("current_brightness"), self.options, 1
+        )
 
     async def async_select_option(self, option: str) -> None:
         """Select an option."""
-        value = self.options.index(option) + 1
-        success = await self.coordinator.api.set_device_property(
-            self.coordinator.dsn, f"set_brightness", value
+        if option not in self.options:
+            raise ServiceValidationError("Unsupported heater brightness")
+        await self.coordinator.async_set_property(
+            "set_brightness", self.options.index(option) + 1
         )
-
-        if success:
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to set device brightness to %s", option)

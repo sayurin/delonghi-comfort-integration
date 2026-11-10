@@ -2,10 +2,11 @@
 
 from datetime import timedelta
 import logging
+import math
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -13,6 +14,26 @@ from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
 from .const import SCAN_INTERVAL, CONF_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def numeric_value(value: Any) -> float | None:
+    """Return finite numeric telemetry, including numeric API strings."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        return None
+    try:
+        number = float(value)
+    except (ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def indexed_value(value: Any, options: list[str], first_value: int = 0) -> str | None:
+    """Map only integral values within the documented device enum."""
+    number = numeric_value(value)
+    if number is None or not number.is_integer():
+        return None
+    index = int(number) - first_value
+    return options[index] if 0 <= index < len(options) else None
 
 
 class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -74,3 +95,9 @@ class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hw_version=self.data.get("hardware_version"),
             sw_version=self.device_version,
         )
+
+    async def async_set_property(self, name: str, value: int | float) -> None:
+        """Report command failures to HA and refresh only after acceptance."""
+        if not await self.api.set_device_property(self.dsn, name, value):
+            raise HomeAssistantError("De'Longhi did not accept the device command")
+        await self.async_request_refresh()
