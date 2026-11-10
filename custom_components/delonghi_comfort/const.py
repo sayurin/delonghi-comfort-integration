@@ -260,3 +260,5 @@ DEFAULT_LANGUAGE = "en"
 
 # Update intervals
 SCAN_INTERVAL = 5  # seconds
+
+SUPPORTED_MODELS = frozenset({"DL-heater"})

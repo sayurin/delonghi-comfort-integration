@@ -2,25 +2,15 @@
 
 from __future__ import annotations
 
-import logging
-
-from homeassistant.components.select import SelectEntity, SelectEntityDescription
+from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-
-_LOGGER = logging.getLogger(__name__)
-
-SELECT_DESCRIPTIONS = (
-    SelectEntityDescription(
-        key="get_device_mode",
-        translation_key="device_mode",
-        options=["cooling", "dehumidification", "fan_only"],
-    ),
-)
+from .coordinator import indexed_value
 
 
 async def async_setup_entry(
@@ -28,96 +18,20 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up De'Longhi select entities."""
+    """Set up De'Longhi heater select entities."""
     data = hass.data[DOMAIN][config_entry.entry_id]
-    coordinators = data["coordinators"]
+    async_add_entities(
+        HeaterBrightness(coordinator=coordinator)
+        for coordinator in data["heater_coordinators"]
+    )
 
-    entities = []
-
-    for coordinator in coordinators:
-        entities.extend(
-            [
-                DeLonghiSelect(
-                    coordinator=coordinator,
-                    description=description,
-                )
-                for description in SELECT_DESCRIPTIONS
-            ]
-        )
-
-    entities.extend([HeaterBrightness(coordinator=coordinator) for coordinator in data["heater_coordinators"]])
-
-    async_add_entities(entities)
-
-
-class DeLonghiSelect(CoordinatorEntity, SelectEntity):
-    """Representation of a De'Longhi select entity."""
-
-    _attr_has_entity_name = True
-
-    def __init__(
-        self,
-        coordinator,
-        description: SelectEntityDescription,
-    ) -> None:
-        """Initialize the select entity."""
-        super().__init__(coordinator)
-        self.entity_description = description
-        self._attr_unique_id = f"{coordinator.dsn}_{description.key}"
-
-        # Device information
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, coordinator.dsn)},
-            "name": coordinator.device_name,
-            "manufacturer": "De'Longhi",
-            "model": coordinator.device_model,
-            "sw_version": coordinator.device_version,
-        }
-
-    @property
-    def current_option(self) -> str | None:
-        """Return the current option."""
-        value = self.coordinator.data.get(self.entity_description.key)
-
-        if value is None:
-            return None
-
-        # Convert device mode value to option
-        mode_map = {1: "cooling", 2: "dehumidification", 3: "fan_only"}
-        return mode_map.get(value)
-
-    async def async_select_option(self, option: str) -> None:
-        """Select an option."""
-        # Convert option to device mode value
-        option_map = {"cooling": 1, "dehumidification": 2, "fan_only": 3}
-
-        device_mode = option_map.get(option)
-        if device_mode is None:
-            _LOGGER.error("Unknown option: %s", option)
-            return
-
-        success = await self.coordinator.api.set_device_mode(
-            self.coordinator.dsn, device_mode
-        )
-
-        if success:
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to set device mode to %s", option)
-
-    @property
-    def available(self) -> bool:
-        """Return if entity is available."""
-        return (
-            super().available and self.entity_description.key in self.coordinator.data
-        )
 
 class HeaterBrightness(CoordinatorEntity, SelectEntity):
     """Representation of a heater brightness entity."""
+
     _attr_has_entity_name = True
     _attr_icon = "mdi:brightness-6"
     _attr_name = "Display brightness"
-
     _attr_options = ["Level 1", "Level 2", "Level 3"]
 
     def __init__(self, coordinator) -> None:
@@ -129,17 +43,14 @@ class HeaterBrightness(CoordinatorEntity, SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current option."""
-        value = self.coordinator.data.get(f"current_brightness")
-        return None if value is None else self.options[value - 1]
+        return indexed_value(
+            self.coordinator.data.get("current_brightness"), self.options, 1
+        )
 
     async def async_select_option(self, option: str) -> None:
         """Select an option."""
-        value = self.options.index(option) + 1
-        success = await self.coordinator.api.set_device_property(
-            self.coordinator.dsn, f"set_brightness", value
+        if option not in self.options:
+            raise ServiceValidationError("Unsupported heater brightness")
+        await self.coordinator.async_set_property(
+            "set_brightness", self.options.index(option) + 1
         )
-
-        if success:
-            await self.coordinator.async_request_refresh()
-        else:
-            _LOGGER.error("Failed to set device brightness to %s", option)

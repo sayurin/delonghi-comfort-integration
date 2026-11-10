@@ -1,115 +1,141 @@
-import voluptuous as vol
+"""Configuration and reauthentication for De'Longhi Comfort."""
+
+from typing import Any
+
+import probatio
+
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-import logging
 
-from .const import (
-    DOMAIN,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_LANGUAGE,
-    LANGUAGES,
-    DEFAULT_LANGUAGE,
-    CONF_SCAN_INTERVAL,
+from .api import (
+    DeLonghiAPI,
+    DeLonghiAuthenticationError,
+    DeLonghiConnectionError,
+    DeLonghiProtocolError,
 )
-from .api import DeLonghiAPI
-
-_LOGGER = logging.getLogger(__name__)
+from .const import (
+    CONF_LANGUAGE,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_USERNAME,
+    DEFAULT_LANGUAGE,
+    DOMAIN,
+    LANGUAGES,
+    SCAN_INTERVAL,
+    SUPPORTED_MODELS,
+)
 
 
 class DelonghiComfortConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for De'Longhi Comfort integration."""
+    """Configure an account without changing its existing unique ID."""
 
     VERSION = 1
 
-    def __init__(self):
-        """Initialize the config flow."""
-        self._username = None
-        self._password = None
-        self._language = None
+    async def _validate_account(self, data: dict[str, Any]) -> str | None:
+        api = DeLonghiAPI(
+            data[CONF_USERNAME],
+            data[CONF_PASSWORD],
+            async_get_clientsession(self.hass),
+            data.get(CONF_LANGUAGE, DEFAULT_LANGUAGE),
+        )
+        try:
+            await api.authenticate()
+            devices = await api.get_devices()
+        except DeLonghiAuthenticationError:
+            return "invalid_auth"
+        except DeLonghiConnectionError:
+            return "cannot_connect"
+        except DeLonghiProtocolError:
+            return "unexpected_response"
+        if not devices:
+            return "no_devices"
+        if not any(device["device"].get("oem_model") in SUPPORTED_MODELS for device in devices):
+            return "unsupported_devices"
+        return None
 
-    async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Create an entry after validating account access and supported devices."""
         errors = {}
-
         if user_input is not None:
-            self._username = user_input[CONF_USERNAME]
-            self._password = user_input[CONF_PASSWORD]
-            self._language = user_input.get(CONF_LANGUAGE, DEFAULT_LANGUAGE)
-
-            # Test the credentials
-            session = async_get_clientsession(self.hass)
-            api = DeLonghiAPI(self._username, self._password, session, self._language)
-            try:
-                if await api.authenticate():
-                    devices = await api.get_devices()
-                    if devices:
-                        # Create a unique ID based on username
-                        await self.async_set_unique_id(self._username)
-                        self._abort_if_unique_id_configured()
-
-                        return self.async_create_entry(
-                            title=f"De'Longhi Comfort ({self._username})",
-                            data={
-                                CONF_USERNAME: self._username,
-                                CONF_PASSWORD: self._password,
-                                CONF_LANGUAGE: self._language,
-                            },
-                        )
-                    else:
-                        errors["base"] = "no_devices"
-                else:
-                    errors["base"] = "invalid_auth"
-            except Exception as e:
-                _LOGGER.error("Unexpected error during authentication: %s", e)
-                errors["base"] = "cannot_connect"
-
+            await self.async_set_unique_id(user_input[CONF_USERNAME])
+            self._abort_if_unique_id_configured()
+            if error := await self._validate_account(user_input):
+                errors["base"] = error
+            else:
+                return self.async_create_entry(
+                    title=f"De'Longhi Comfort ({user_input[CONF_USERNAME]})",
+                    data=user_input,
+                )
         return self.async_show_form(
-            step_id="user", data_schema=self._get_schema(), errors=errors
+            step_id="user",
+            data_schema=probatio.Schema(
+                {
+                    probatio.Required(CONF_USERNAME): str,
+                    probatio.Required(probatio.Secret(CONF_PASSWORD)): str,
+                    probatio.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): probatio.In(
+                        list(LANGUAGES)
+                    ),
+                }
+            ),
+            errors=errors,
         )
 
-    @callback
-    def _get_schema(self):
-        """Return the schema for the user input form."""
-        return vol.Schema(
-            {
-                vol.Required(CONF_USERNAME): str,
-                vol.Required(CONF_PASSWORD): str,
-                vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(
-                    list(LANGUAGES.keys())
-                ),
-            }
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
+        """Ask for new credentials without creating another entry."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Replace only the password of the account being reauthenticated."""
+        entry = self._get_reauth_entry()
+        errors = {}
+        if user_input is not None:
+            data = {**entry.data, CONF_PASSWORD: user_input[CONF_PASSWORD]}
+            if error := await self._validate_account(data):
+                errors["base"] = error
+            else:
+                return self.async_update_reload_and_abort(entry, data_updates=data)
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=probatio.Schema(
+                {probatio.Required(probatio.Secret(CONF_PASSWORD)): str}
+            ),
+            errors=errors,
         )
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        return DelonghiComfortOptionsFlow(config_entry)
+        return DelonghiComfortOptionsFlow()
 
 
 class DelonghiComfortOptionsFlow(config_entries.OptionsFlow):
-    """Handle options flow for De'Longhi Comfort integration."""
+    """Change polling options without storing account credentials in options."""
 
-    def __init__(self, config_entry):
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Optional(
-                        CONF_SCAN_INTERVAL,
-                        default=self.config_entry.options.get(CONF_SCAN_INTERVAL, 15),
-                    ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
-                }
-            ),
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the polling interval."""
+        schema = probatio.Schema(
+            {
+                probatio.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=self.config_entry.options.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL),
+                ): probatio.All(probatio.Coerce(int), probatio.Range(min=5, max=300)),
+            }
         )
+        errors = {}
+        if user_input is not None:
+            try:
+                options = schema(user_input)
+            except probatio.Invalid:
+                errors["base"] = "invalid_scan_interval"
+            else:
+                return self.async_create_entry(title="", data=options)
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

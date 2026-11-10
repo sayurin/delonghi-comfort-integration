@@ -1,0 +1,11 @@
+[
+  {"property": {"name": "room_temp", "value": 20.5}},
+  {"property": {"name": "temperature_setpoint", "value": 21}},
+  {"property": {"name": "device_status", "value": 1}},
+  {"property": {"name": "device_mode", "value": 4}},
+  {"property": {"name": "current_power_level", "value": 2}},
+  {"property": {"name": "MDH_Resources", "value": 2}},
+  {"property": {"name": "current_brightness", "value": 2}},
+  {"property": {"name": "get_eco", "value": 1}},
+  {"property": {"name": "get_lock", "value": 0}}
+]

@@ -1,205 +1,226 @@
-# De'Longhi Comfort Home Assistant Integration
+# De'Longhi Comfort for Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub release](https://img.shields.io/github/release/philm5/delonghi-comfort-integration.svg)](https://github.com/philm5/delonghi-comfort-integration/releases/)
+[![Validate](https://github.com/sayurin/delonghi-comfort-integration/actions/workflows/validate.yml/badge.svg)](https://github.com/sayurin/delonghi-comfort-integration/actions/workflows/validate.yml)
 
-This repository contains a comprehensive Home Assistant integration for De'Longhi Comfort air conditioning and dehumidification devices. The integration provides full control and monitoring capabilities through Home Assistant's user interface.
+An independently maintained custom integration for De'Longhi Multi Dynamic
+Heaters, derived from
+[philm5/delonghi-comfort-integration](https://github.com/philm5/delonghi-comfort-integration).
+Upstream contributions remain welcome, but this fork does not require upstream
+approval to maintain its own changes.
 
-## ⚠️ Disclaimer
+## Status and supported devices
 
-**IMPORTANT**: This integration is provided "as-is" without any warranty or guarantee. The author takes no responsibility for any damage, data loss, or issues that may arise from using this integration. Use at your own risk.
+**New releases are on hold pending the licensing and API-configuration review
+described below.** A passing CI run does not resolve those questions.
+This project is not advertised as part of the Marketplace default catalog.
 
-**AI-Assisted Development**: Much of the work converting this to a Home Assistant integration was done using **GitHub Copilot** and other AI assistance tools. This README was also created with the help of an LLM model. While every effort has been made to ensure accuracy and functionality, please thoroughly test before deploying in production environments.
+- Only devices reporting `oem_model: DL-heater` are initialized.
+- Unknown models, including previously enabled air conditioners and
+  dehumidifiers, are skipped with a warning. An account with no supported devices
+  cannot be configured. Existing registrations are not deleted automatically.
+- Legacy non-heater entity implementations and the unused number platform have
+  been removed. Only heater entities are created; adding model support later
+  requires a reviewed implementation rather than re-enabling dormant code.
+- The `delonghi_comfort` domain, account unique IDs and heater entity unique IDs
+  remain unchanged. Back up your HA configuration before upgrading.
+- Minimum Home Assistant: **2026.11.0**. Use the latest stable patch release.
+  Earlier versions are no longer claimed as supported.
+- A De'Longhi Comfort account with registered devices and internet access is
+  required. This integration depends on unofficial cloud API behavior and can
+  stop working if the vendor changes or withdraws that API.
 
-This integration is based on the excellent work of:
-- **[rtfpessoa/delonghi-comfort-client](https://github.com/rtfpessoa/delonghi-comfort-client)** - Thank you for the initial client implementation
-- **[duckwc/ECAMpy](https://github.com/duckwc/ECAMpy)** - Thanks for the authentication and token conversion code
+### Heater entities
 
-## 🚀 Features
+| Entity | Function |
+| --- | --- |
+| Climate | Heat/off; target temperature 10-28 C in 0.5 C steps |
+| Climate presets | Day mode, Night mode, Antifrost, Manual |
+| Climate power control | Power levels displayed as 0%, 20%, 40%, 60%, 80%, 100% |
+| Temperature sensor | Room temperature |
+| Display brightness select | Level 1, Level 2, Level 3 |
+| Eco and child-lock switches | Enable/disable the corresponding device setting |
 
-### Climate Control
-- **HVAC Modes**: Cool, Heat, Dry (dehumidify), Fan Only, Off
-- **Temperature Control**: Set target temperature with precise control
-- **Fan Speed Control**: Multiple fan speed settings
-- **Real-time Status**: Live updates of device status and settings
+These are heater power levels, not a claim that the appliance has a fan.
+Missing or unknown telemetry is reported as unknown rather than inventing a
+valid preset, power level, or off state. Communication failures make entities
+unavailable; failed commands raise a Home Assistant error instead of appearing
+successful.
 
-### Sensors
-- **Room Temperature**: Current ambient temperature
-- **Target Temperature**: Current temperature setpoint
-- **Room Humidity**: Current humidity levels
-- **Device Status**: Operating status (on/off/standby)
-- **Device Mode**: Current operating mode
-- **Fan Speed**: Current fan speed setting
+### Migration: preset and power-level values
 
-### Controls
-- **Power Switch**: Turn device on/off
-- **Temperature Controls**: Precise temperature adjustment
-- **Mode Selection**: Easy switching between operating modes
-- **Fan Speed Selection**: Control fan speed levels
+**Breaking change:** preset and fan-mode attribute/service values are normalized
+to support Home Assistant's validated custom icons. English UI labels remain
+unchanged, but update automations, scripts, templates and dashboards that use the
+old raw values:
 
-### Advanced Features
-- **Configuration Flow**: Easy setup through Home Assistant UI
-- **Device Discovery**: Automatic detection of De'Longhi devices
-- **Coordinator Pattern**: Efficient data updates with minimal API calls
-- **Cloud Polling**: Regular status updates from De'Longhi cloud services
+| Attribute | Previous value | New value |
+| --- | --- | --- |
+| `preset_mode` | `Day mode` | `day_mode` |
+| `preset_mode` | `Night mode` | `night_mode` |
+| `preset_mode` | `Antifrost` | `antifrost` |
+| `preset_mode` | `Manual` | `manual` |
+| `fan_mode` | `0%`, `20%`, `40%`, `60%`, `80%`, `100%` | `"0"`, `"20"`, `"40"`, `"60"`, `"80"`, `"100"` |
 
-## 📋 Requirements
+Use the new values in `climate.set_preset_mode` and `climate.set_fan_mode` calls.
+Power levels are **strings**, so quote them in YAML. Device command numbers and
+entity unique IDs have not changed. The restored preset/power-level icons match
+these new values.
 
-- Home Assistant 2023.1.0 or newer
-- De'Longhi Comfort account with registered devices
-- Internet connection for cloud API access
+### Hardware validation
 
-## 🔧 Installation
+On 2026-11-10, the maintainer reported successful real-device checks on
+**MDHAA15WIFI-BK** of readings, power, target temperature, presets, power levels,
+brightness, Eco and child lock after the consent-signature fix. The rebuilt
+integration was then checked after Core startup: display, operation and
+integration reload were confirmed working. This is not a claim of testing every
+`DL-heater` variant, nor a real-device recheck after normalizing the preset and
+power-level values. Credential expiry and communication-loss recovery have
+offline tests but have not been verified against the real service/device.
+Test fixtures are synthetic, based on the existing implementation, not captured
+device responses.
 
-### Method 1: HACS (Recommended)
-1. Open HACS in Home Assistant
-2. Go to "Integrations"
-3. Click the three dots menu and select "Custom repositories"
-4. Add this repository URL and select "Integration" as the category
-5. Find "De'Longhi Comfort" in the list and install it
-6. Restart Home Assistant
+Additional models require documented properties and capabilities, sanitized test
+fixtures, regression tests and an explicit record of hardware-tested versus
+fixture-only behavior before being enabled.
 
-### Method 2: Manual Installation
-1. **Download the integration**:
-   ```bash
-   git clone https://github.com/philm5/delonghi-comfort-integration.git
-   ```
+## Installation
 
-2. **Copy to custom_components**:
-   Copy the `custom_components/delonghi_comfort` folder to your Home Assistant `custom_components` directory:
-   ```
-   config/
-   └── custom_components/
-       └── delonghi_comfort/
-           ├── __init__.py
-           ├── api.py
-           ├── climate.py
-           ├── config_flow.py
-           ├── const.py
-           ├── coordinator.py
-           ├── manifest.json
-           ├── number.py
-           ├── select.py
-           ├── sensor.py
-           ├── switch.py
-           └── translations/
-               └── en.json
-   ```
+### Marketplace (published ZIP releases)
 
-3. **Restart Home Assistant**
+These steps apply only after an approved release has been published. While
+releases are on hold, use the manual/development method below. Draft releases
+are not public installable versions.
 
-## ⚙️ Configuration
+1. Open **Marketplace**, then its overflow menu > **Custom repositories**.
+   Add `https://github.com/sayurin/delonghi-comfort-integration` with category
+   **Integration**.
+2. Select **De'Longhi Comfort**, install a published release and restart Home
+   Assistant. Marketplace downloads the release asset `delonghi_comfort.zip`,
+   not a snapshot of the default branch.
+3. Under **Settings > Devices & services**, add **De'Longhi Comfort**.
+4. Enter your account email, password and language.
 
-### Initial Setup
-1. Navigate to **Settings** → **Devices & Services** in Home Assistant
-2. Click **Add Integration**
-3. Search for **De'Longhi Comfort**
-4. Enter your De'Longhi Comfort account credentials:
-   - **Username**: Your De'Longhi account email
-   - **Password**: Your De'Longhi account password
-   - **Language**: Select your preferred language/region
-   - **Scan Interval**: Update frequency (default: 60 seconds)
+The repository manifest remains named `hacs.json` for Marketplace compatibility.
+It enables ZIP releases, names the exact asset and hides default-branch installs.
 
-### Configuration Options
-- **Scan Interval**: How often to poll the API for updates (30-300 seconds)
-- **Device Selection**: Choose which devices to integrate
+### Manual installation and development
 
-## 🏠 Usage
+From a checkout, copy `custom_components/delonghi_comfort` into your
+configuration's `custom_components` directory. From a published release,
+create `custom_components/delonghi_comfort/` and extract `delonghi_comfort.zip`
+**inside it**: `manifest.json` and `__init__.py` are at the ZIP root, without a
+wrapping directory. Alternatively, the full `delonghi-comfort-integration-v<version>.zip`
+contains `custom_components/delonghi_comfort/` plus README, LICENSE and NOTICE.
+Restart HA, add **De'Longhi Comfort** under **Settings > Devices & services**
+and enter your account details. Workspace development uses the symlink described
+below instead of a copy.
 
-### Dashboard Cards
-Once configured, you'll have access to various entities:
+Do not install this copy alongside another integration using the same domain.
+The generic radiator icon is original AI-assisted artwork, not a manufacturer
+logo or an indication of endorsement.
 
-#### Climate Entity
-- `climate.delonghi_comfort_[device_id]`
-- Full climate control with temperature, mode, and fan speed
+## Configuration and troubleshooting
 
-#### Sensors
-- `sensor.delonghi_comfort_[device_id]_room_temperature`
-- `sensor.delonghi_comfort_[device_id]_room_humidity`
-- `sensor.delonghi_comfort_[device_id]_target_temperature`
-- `sensor.delonghi_comfort_[device_id]_device_status`
+- The polling interval is an option: **5-300 seconds**, default **5 seconds per
+  device**. Increase it to reduce cloud traffic.
+- Expired credentials trigger HA's reauthentication flow. The replacement
+  password is saved to the same entry; account and entity IDs do not change.
+- Authentication failures, connection failures and unexpected API responses are
+  reported separately. An empty successful device list is distinct from an
+  outage.
+- Account credentials are stored in the HA Config Entry, following HA's normal
+  configuration model. That is not a guarantee of encryption. Protect your
+  config directory, backups and logs; do not reuse production credentials in
+  shared development configurations.
+- Account credentials, API tokens, signatures, response bodies and device
+  identifiers must not be included in logs or issue reports. Even when reporting
+  an exception, review it and remove identifying information first.
 
-#### Controls
-- `switch.delonghi_comfort_[device_id]_power`
-- `number.delonghi_comfort_[device_id]_temperature`
-- `select.delonghi_comfort_[device_id]_mode`
-- `select.delonghi_comfort_[device_id]_fan_speed`
+Report reproducible problems using the
+[issue tracker](https://github.com/sayurin/delonghi-comfort-integration/issues).
+Include HA/integration versions, the product model, expected/actual behavior and
+sanitized logs. Never include a password, token, email, serial number or DSN.
 
-## 🐛 Troubleshooting
+## Development and validation
 
-### Common Issues
-1. **Authentication Errors**: Verify your De'Longhi account credentials
-2. **No Devices Found**: Ensure devices are registered in the De'Longhi app
-3. **Connection Timeouts**: Check internet connection and API status
-4. **Slow Updates**: Adjust scan interval in configuration
+Keep integration-specific changes and tests in this repository. Within the
+`hass-dev` development workspace, use its normal Core venv and symlink:
 
-### Debug Logging
-Add to your `configuration.yaml`:
-```yaml
-logger:
-  default: warning
-  logs:
-    custom_components.delonghi_comfort: debug
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-### Development Setup
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-### Automated Workflows
-
-This repository includes GitHub Actions for quality assurance and release management:
-
-#### 🔍 Validation Workflow
-- **Triggers**: Runs on every push to main/master and on pull requests
-- **Validates**: 
-  - Python syntax and compilation
-  - Home Assistant manifest.json structure
-  - HACS compatibility requirements
-  - File structure integrity
-  - Basic code quality checks
-
-#### 🚀 Release Workflow
-- **Triggers**: Runs when tags are pushed (e.g., `v1.0.0`) or manually triggered
-- **Creates**:
-  - `delonghi_comfort.zip` - Integration files only (for HACS/manual install)
-  - `delonghi-comfort-integration-[version].zip` - Complete package with documentation
-  - GitHub release with auto-generated release notes
-- **Updates**: Automatically updates version in manifest.json to match the tag
-
-To create a new release:
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+# From hass-dev; stop HA before bootstrap or switching branches.
+bash scripts/hass-dev.sh bootstrap
+bash scripts/hass-dev.sh run delonghi python -m unittest discover -s tests -v
+bash scripts/hass-dev.sh hass
 ```
 
-## 📄 License
+DeLonghi is independent of the ECHONET Lite worktree sets and generator/release
+workflow; do not combine `run delonghi` with `--set`. Do not install this
+repository's `requirements.txt` over the workspace's Core venv: it already
+provides the checked-out HA. For a standalone environment, `requirements.txt`
+installs HA and its dependencies.
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+Offline tests cover authentication, token refresh, config/reauth/options flows,
+setup and unload, model filtering, coordinator failures, heater telemetry and
+commands, existing IDs, and release archives. They never access an account or
+operate a heater. Unit tests do not replace human hardware checks.
 
-### License Attribution
+CI runs those tests against the minimum HA version and latest stable HA,
+plus official hassfest and the legacy-named `hacs/action` repository validator.
+That validator is a structural check, not acceptance into the Marketplace
+default catalog or legal clearance.
 
-This project incorporates code from the following Apache 2.0 licensed projects:
-- **[rtfpessoa/delonghi-comfort-client](https://github.com/rtfpessoa/delonghi-comfort-client)** - Licensed under Apache 2.0
-- **[duckwc/ECAMpy](https://github.com/duckwc/ECAMpy)** - Authentication and token conversion code
+## Releases and unresolved prerequisites
 
-All modifications and additions to the original code are also licensed under Apache 2.0. See the NOTICE file for detailed attribution information.
+No version bump, tag or release is implied by merging development changes.
+The existing manifest version is retained until a separate release decision.
 
-## 🙏 Acknowledgments
+Before any independent release:
 
-- **[rtfpessoa](https://github.com/rtfpessoa)** for the original [delonghi-comfort-client](https://github.com/rtfpessoa/delonghi-comfort-client)
-- **[duckwc](https://github.com/duckwc)** for the authentication code from [ECAMpy](https://github.com/duckwc/ECAMpy)
-- The Home Assistant community for guidance and best practices
+1. Resolve the third-party attribution/permission questions in [NOTICE](NOTICE).
+   The integration and `rtfpessoa/delonghi-comfort-client` have Apache-2.0
+   licenses. `duckwc/ECAMpy`, named as a source of authentication code, had no
+   LICENSE file in its public repository when checked on 2026-11-10.
+   Do not assume its code is Apache-2.0 or otherwise cleared for redistribution.
+   Confirm the provenance of the used portions and obtain any required
+   permission or a suitable replacement before release.
+2. Resolve or explicitly document the provenance, permissions and vendor terms
+   for the existing API/client/app configuration values. Their ownership and
+   privilege level are not verified; they cannot currently be rotated by this
+   maintainer. They are distinct from each user's login credentials. They have
+   not been added to fixtures or copied into documentation, and moving them to
+   an environment variable would not establish permission or secrecy. If any
+   value is privileged or its use is not permitted, stop distribution and obtain
+   a permitted authentication method.
+3. Record the exact hardware model and validation scope, check restart/reload,
+   authentication expiry, communication loss and recovery, and review CI results.
+4. Update the manifest version in a reviewed commit and create a matching
+   `v<version>` tag. The release builder reads the tag's committed tree and
+   rejects tag/manifest mismatches; it never rewrites the manifest.
+5. Only after explicit human approval, set the repository Actions variable
+   `DELONGHI_RELEASE_APPROVED` to `true`. Until then the release workflow fails
+   explicitly without publishing anything. The approved workflow creates a
+   **draft** release for final human review, not an automatic public release.
+6. Review both draft assets and publish the approved release manually. Keep
+   `delonghi_comfort.zip` attached with that exact filename for Marketplace;
+   the full archive is for manual installation and attribution review.
 
-## 📞 Support
+The two archives contain only committed integration files and the documented
+license/readme files, not local configuration, test output, bytecode, credentials
+or private planning documents. Release notes are generated from the repository's
+changes rather than claiming untested model support.
 
-- Create an issue on GitHub for bug reports
-- Check existing issues before creating new ones
-- Provide logs and device information when reporting issues
+## License and acknowledgments
+
+The original integration is distributed under [Apache-2.0](LICENSE).
+Modifications to this fork are offered under the same license, subject to the
+unresolved third-party provenance described above; this does not relicense code
+owned by others. Existing third-party notices are retained in [NOTICE](NOTICE).
+
+Thanks to [philm5](https://github.com/philm5),
+[rtfpessoa/delonghi-comfort-client](https://github.com/rtfpessoa/delonghi-comfort-client),
+[duckwc/ECAMpy](https://github.com/duckwc/ECAMpy) and other contributors.
+Development and the generic brand icon have used AI assistance.
+
+This unofficial integration is provided as-is, without warranty or manufacturer
+endorsement. Review behavior before relying on it; never use it as a substitute
+for an appliance's physical safety controls.

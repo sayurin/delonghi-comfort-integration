@@ -1,7 +1,5 @@
 {
   "config": {
-    "title": "De'Longhi Comfort Integration",
-    "description": "Integration for managing De'Longhi comfort devices.",
     "step": {
       "user": {
         "title": "De'Longhi Comfort",
@@ -11,19 +9,32 @@
           "password": "Password",
           "language": "Language"
         }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect De'Longhi Comfort",
+        "description": "Enter the current password for this account.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
       "invalid_auth": "Invalid authentication credentials",
       "cannot_connect": "Failed to connect to De'Longhi servers",
       "no_devices": "No devices found on your account",
-      "unknown": "Unexpected error occurred"
+      "unknown": "Unexpected error occurred",
+      "unexpected_response": "De'Longhi returned an unexpected response. Check for an integration update.",
+      "unsupported_devices": "No supported devices found. Only DL-heater devices are currently supported."
     },
     "abort": {
-      "already_configured": "Account is already configured"
+      "already_configured": "Account is already configured",
+      "reauth_successful": "Authentication was updated successfully"
     }
   },
   "options": {
+    "error": {
+      "invalid_scan_interval": "Enter an update interval between 5 and 300 seconds"
+    },
     "step": {
       "init": {
         "title": "De'Longhi Comfort Options",
@@ -34,11 +45,32 @@
       }
     }
   },
-  "device": {
-    "name": "De'Longhi Device",
-    "description": "Manage your De'Longhi comfort device."
-  },
   "entity": {
+    "climate": {
+      "heater": {
+        "name": "Heater",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "day_mode": "Day mode",
+              "night_mode": "Night mode",
+              "antifrost": "Antifrost",
+              "manual": "Manual"
+            }
+          },
+          "fan_mode": {
+            "state": {
+              "0": "0%",
+              "20": "20%",
+              "40": "40%",
+              "60": "60%",
+              "80": "80%",
+              "100": "100%"
+            }
+          }
+        }
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "Room temperature"
@@ -94,6 +126,12 @@
       }
     },
     "switch": {
+      "eco": {
+        "name": "Eco"
+      },
+      "lock": {
+        "name": "Child lock"
+      },
       "device_power": {
         "name": "Device power"
       },
