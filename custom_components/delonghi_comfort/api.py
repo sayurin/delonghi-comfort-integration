@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import urllib.parse
 from datetime import datetime
 from typing import Any
@@ -21,6 +22,9 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# The consent page has used both single and double quotes for this literal.
+_CONSENT_SIG_RE = re.compile(r"""const\s+consentObj2Sig\s*=\s*(["'])(.*?)\1""")
 
 
 class DeLonghiAPI:
@@ -222,7 +226,10 @@ class DeLonghiAPI:
             ) as response:
                 consent_text = await response.text()
 
-            signature = consent_text.split("const consentObj2Sig = '")[1].split("';")[0]
+            if not (match := _CONSENT_SIG_RE.search(consent_text)):
+                _LOGGER.error("Consent signature not found in consent page")
+                return None
+            signature = match.group(2)
 
             # Step 6: Authorization
             async with self.session.get(
