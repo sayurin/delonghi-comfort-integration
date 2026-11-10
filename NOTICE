@@ -1,5 +1,10 @@
 De'Longhi Comfort Home Assistant Integration
-Copyright 2024-2025 [Your Name]
+Original integration: philm5/delonghi-comfort-integration
+Original NOTICE copyright line (unresolved placeholder, retained verbatim):
+  Copyright 2024-2025 [Your Name]
+
+Modifications: Copyright 2025-2026 sayurin and contributors.
+The original authors' rights and notices are not replaced by this attribution.
 
 This product includes software developed by third parties:
 
@@ -13,6 +18,10 @@ This product includes software developed by third parties:
    Available at: https://github.com/duckwc/ECAMpy
    
    Portions of the authentication and token conversion code are derived from this project.
+   Permission/license for those portions has not been verified. No LICENSE file
+   was present in that public repository when checked on 2026-11-10. This notice
+   does not assign an Apache-2.0 license to ECAMpy or establish permission to
+   redistribute its code. Independent releases remain on hold pending review.
 
 The Apache License 2.0 can be found at:
 http://www.apache.org/licenses/LICENSE-2.0
@@ -25,4 +34,5 @@ Modifications and additions to the original code:
 - Translation files
 - Documentation and examples
 
-All modifications are licensed under the Apache License 2.0.
+Modifications owned by this fork's contributors are offered under Apache-2.0.
+This does not relicense third-party code or resolve the permission issue above.

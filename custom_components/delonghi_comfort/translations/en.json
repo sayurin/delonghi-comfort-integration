@@ -1,7 +1,5 @@
 {
   "config": {
-    "title": "De'Longhi Comfort Integration",
-    "description": "Integration for managing De'Longhi comfort devices.",
     "step": {
       "user": {
         "title": "De'Longhi Comfort",
@@ -10,13 +8,13 @@
           "username": "Email",
           "password": "Password",
           "language": "Language"
-        },
-        "reauth_confirm": {
-          "title": "Reconnect De'Longhi Comfort",
-          "description": "Enter the current password for this account.",
-          "data": {
-            "password": "Password"
-          }
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reconnect De'Longhi Comfort",
+        "description": "Enter the current password for this account.",
+        "data": {
+          "password": "Password"
         }
       }
     },
@@ -47,11 +45,12 @@
       }
     }
   },
-  "device": {
-    "name": "De'Longhi Device",
-    "description": "Manage your De'Longhi comfort device."
-  },
   "entity": {
+    "climate": {
+      "heater": {
+        "name": "Heater"
+      }
+    },
     "sensor": {
       "room_temperature": {
         "name": "Room temperature"
@@ -107,6 +106,12 @@
       }
     },
     "switch": {
+      "eco": {
+        "name": "Eco"
+      },
+      "lock": {
+        "name": "Child lock"
+      },
       "device_power": {
         "name": "Device power"
       },

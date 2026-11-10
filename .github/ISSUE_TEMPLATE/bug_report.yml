@@ -1,0 +1,33 @@
+name: Bug report
+description: Report a reproducible De'Longhi Comfort integration problem
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include passwords, tokens, signatures, email addresses, serial
+        numbers, DSNs or unredacted API responses. Review logs before posting.
+        Only DL-heater devices are currently supported.
+  - type: input
+    id: versions
+    attributes:
+      label: Home Assistant and integration versions
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Product model (not serial number or DSN)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce, expected result and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove all identifying information and credentials before posting.
+      render: text

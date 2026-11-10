@@ -10,6 +10,7 @@ from homeassistant.exceptions import (
     ConfigEntryNotReady,
 )
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import config_validation as cv
 
 from .const import (
     DOMAIN,
@@ -24,6 +25,8 @@ from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
 from .coordinator import DeLonghiCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-import voluptuous as vol
+import probatio
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
@@ -72,11 +72,11 @@ class DelonghiComfortConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
+            data_schema=probatio.Schema(
                 {
-                    vol.Required(CONF_USERNAME): str,
-                    vol.Required(CONF_PASSWORD): str,
-                    vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): vol.In(
+                    probatio.Required(CONF_USERNAME): str,
+                    probatio.Required(probatio.Secret(CONF_PASSWORD)): str,
+                    probatio.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): probatio.In(
                         list(LANGUAGES)
                     ),
                 }
@@ -102,7 +102,9 @@ class DelonghiComfortConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return self.async_update_reload_and_abort(entry, data_updates=data)
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            data_schema=probatio.Schema(
+                {probatio.Required(probatio.Secret(CONF_PASSWORD)): str}
+            ),
             errors=errors,
         )
 
@@ -120,19 +122,19 @@ class DelonghiComfortOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the polling interval."""
-        schema = vol.Schema(
+        schema = probatio.Schema(
             {
-                vol.Optional(
+                probatio.Optional(
                     CONF_SCAN_INTERVAL,
                     default=self.config_entry.options.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL),
-                ): vol.All(vol.Coerce(int), vol.Range(min=5, max=300)),
+                ): probatio.All(probatio.Coerce(int), probatio.Range(min=5, max=300)),
             }
         )
         errors = {}
         if user_input is not None:
             try:
                 options = schema(user_input)
-            except vol.Invalid:
+            except probatio.Invalid:
                 errors["base"] = "invalid_scan_interval"
             else:
                 return self.async_create_entry(title="", data=options)
