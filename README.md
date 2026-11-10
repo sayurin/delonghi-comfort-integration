@@ -43,13 +43,15 @@ valid preset, power level, or off state. Communication failures make entities
 unavailable; failed commands raise a Home Assistant error instead of appearing
 successful.
 
-On 2026-11-10, the maintainer reported successful real-device checks of readings,
-power, target temperature, presets, power levels, brightness, Eco and child lock,
-after the consent-signature fix. The exact product model has not yet been
-recorded here. This is not a claim of testing every `DL-heater` variant or of
-testing all subsequent changes. Restart/reload and credential-expiry recovery
-must be checked separately. Test fixtures in this repository are synthetic,
-based on the existing implementation, not captured device responses.
+On 2026-11-10, the maintainer reported successful real-device checks on
+**MDHAA15WIFI-BK** of readings, power, target temperature, presets, power levels,
+brightness, Eco and child lock after the consent-signature fix. The rebuilt
+integration was then checked after Core startup: display, operation and
+integration reload were confirmed working. This is not a claim of testing every
+`DL-heater` variant. Credential expiry and communication-loss recovery have
+offline tests but have not been verified against the real service/device.
+Test fixtures are synthetic, based on the existing implementation, not captured
+device responses.
 
 Additional models require documented properties and capabilities, sanitized test
 fixtures, regression tests and an explicit record of hardware-tested versus
