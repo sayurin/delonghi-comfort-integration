@@ -244,11 +244,11 @@ class DeLonghiHeater(CoordinatorEntity, ClimateEntity):
     _attr_icon = "mdi:radiator"
 
     # Climate entity - Properties
-    _attr_fan_modes = ["0%", "20%", "40%", "60%", "80%", "100%"]
+    _attr_fan_modes = ["0", "20", "40", "60", "80", "100"]
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
     _attr_max_temp = 28
     _attr_min_temp = 10
-    _attr_preset_modes = ["Day mode", "Night mode", "Antifrost", "Manual"]
+    _attr_preset_modes = ["day_mode", "night_mode", "antifrost", "manual"]
     _attr_target_temperature_step = 0.5
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
 

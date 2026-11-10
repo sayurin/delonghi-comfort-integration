@@ -32,7 +32,7 @@ This project is not advertised as part of the HACS default catalog.
 | --- | --- |
 | Climate | Heat/off; target temperature 10-28 C in 0.5 C steps |
 | Climate presets | Day mode, Night mode, Antifrost, Manual |
-| Climate power control | Existing fan-mode API labels: 0%, 20%, 40%, 60%, 80%, 100% |
+| Climate power control | Power levels displayed as 0%, 20%, 40%, 60%, 80%, 100% |
 | Temperature sensor | Room temperature |
 | Display brightness select | Level 1, Level 2, Level 3 |
 | Eco and child-lock switches | Enable/disable the corresponding device setting |
@@ -43,12 +43,35 @@ valid preset, power level, or off state. Communication failures make entities
 unavailable; failed commands raise a Home Assistant error instead of appearing
 successful.
 
+### Migration: preset and power-level values
+
+**Breaking change:** preset and fan-mode attribute/service values are normalized
+to support Home Assistant's validated custom icons. English UI labels remain
+unchanged, but update automations, scripts, templates and dashboards that use the
+old raw values:
+
+| Attribute | Previous value | New value |
+| --- | --- | --- |
+| `preset_mode` | `Day mode` | `day_mode` |
+| `preset_mode` | `Night mode` | `night_mode` |
+| `preset_mode` | `Antifrost` | `antifrost` |
+| `preset_mode` | `Manual` | `manual` |
+| `fan_mode` | `0%`, `20%`, `40%`, `60%`, `80%`, `100%` | `"0"`, `"20"`, `"40"`, `"60"`, `"80"`, `"100"` |
+
+Use the new values in `climate.set_preset_mode` and `climate.set_fan_mode` calls.
+Power levels are **strings**, so quote them in YAML. Device command numbers and
+entity unique IDs have not changed. The restored preset/power-level icons match
+these new values.
+
+### Hardware validation
+
 On 2026-11-10, the maintainer reported successful real-device checks on
 **MDHAA15WIFI-BK** of readings, power, target temperature, presets, power levels,
 brightness, Eco and child lock after the consent-signature fix. The rebuilt
 integration was then checked after Core startup: display, operation and
 integration reload were confirmed working. This is not a claim of testing every
-`DL-heater` variant. Credential expiry and communication-loss recovery have
+`DL-heater` variant, nor a real-device recheck after normalizing the preset and
+power-level values. Credential expiry and communication-loss recovery have
 offline tests but have not been verified against the real service/device.
 Test fixtures are synthetic, based on the existing implementation, not captured
 device responses.

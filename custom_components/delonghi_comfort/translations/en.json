@@ -48,7 +48,27 @@
   "entity": {
     "climate": {
       "heater": {
-        "name": "Heater"
+        "name": "Heater",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "day_mode": "Day mode",
+              "night_mode": "Night mode",
+              "antifrost": "Antifrost",
+              "manual": "Manual"
+            }
+          },
+          "fan_mode": {
+            "state": {
+              "0": "0%",
+              "20": "20%",
+              "40": "40%",
+              "60": "60%",
+              "80": "80%",
+              "100": "100%"
+            }
+          }
+        }
       }
     },
     "sensor": {
