@@ -1,13 +1,14 @@
 """API client for De'Longhi Comfort devices."""
 
+import asyncio
 import json
-import logging
 import re
 import urllib.parse
 from datetime import datetime
 from typing import Any
 
 import aiohttp
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
     API_KEY,
@@ -21,10 +22,25 @@ from .const import (
     SDK_BUILD,
 )
 
-_LOGGER = logging.getLogger(__name__)
-
 # The consent page has used both single and double quotes for this literal.
 _CONSENT_SIG_RE = re.compile(r"""const\s+consentObj2Sig\s*=\s*(["'])(.*?)\1""")
+_REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
+
+class DeLonghiError(HomeAssistantError):
+    """An API operation could not be completed."""
+
+
+class DeLonghiAuthenticationError(DeLonghiError):
+    """The account credentials or session are no longer valid."""
+
+
+class DeLonghiConnectionError(DeLonghiError):
+    """The service could not be reached or is temporarily unavailable."""
+
+
+class DeLonghiProtocolError(DeLonghiError):
+    """The service returned an unexpected response."""
 
 
 class DeLonghiAPI:
@@ -42,8 +58,37 @@ class DeLonghiAPI:
         self.password = password
         self.language = language
         self.session = session
-        self.access_token = None
-        self.refresh_token = None
+        self.access_token: str | None = None
+        self.refresh_token: str | None = None
+        self._auth_lock = asyncio.Lock()
+
+    @staticmethod
+    def _check_status(response: aiohttp.ClientResponse) -> None:
+        """Classify HTTP failures without exposing a URL or response body."""
+        if response.status in (401, 403):
+            raise DeLonghiAuthenticationError("De'Longhi authentication expired or denied")
+        if response.status == 429 or response.status >= 500:
+            raise DeLonghiConnectionError("De'Longhi service is temporarily unavailable")
+        if response.status >= 400:
+            raise DeLonghiProtocolError("De'Longhi rejected the API request")
+
+    async def _read_json(self, response: aiohttp.ClientResponse) -> Any:
+        """Read JSON without putting API responses in exception messages."""
+        self._check_status(response)
+        try:
+            return json.loads(await response.text())
+        except (ValueError, UnicodeError):
+            raise DeLonghiProtocolError("De'Longhi returned invalid JSON") from None
+
+    @staticmethod
+    def _require_string(data: dict[str, Any], key: str) -> str:
+        """Reject absent and empty tokens rather than sending them to another endpoint."""
+        if not isinstance(data, dict):
+            raise DeLonghiProtocolError("De'Longhi returned an incomplete authentication response")
+        value = data[key]
+        if not isinstance(value, str) or not value:
+            raise DeLonghiProtocolError("De'Longhi returned an incomplete authentication response")
+        return value
 
     def get_query_param(self, url: str, param: str) -> str | None:
         """Extract query parameter from URL."""
@@ -57,14 +102,11 @@ class DeLonghiAPI:
 
     async def authenticate(self) -> bool:
         """Authenticate with the De'Longhi API."""
-        try:
+        async with self._auth_lock:
             self.access_token = await self._get_new_access_token()
-            return self.access_token is not None
-        except Exception as e:
-            _LOGGER.error("Authentication failed: %s", e)
-            return False
+        return True
 
-    async def _get_new_access_token(self) -> str | None:
+    async def _get_new_access_token(self) -> str:
         """Get a new access token through the full authentication flow."""
 
         
@@ -83,8 +125,12 @@ class DeLonghiAPI:
                     "nonce": str(int(datetime.now().timestamp())),
                 },
                 allow_redirects=False,
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
+                self._check_status(response)
                 context = self.get_query_param(response.headers["Location"], "context")
+                if not context:
+                    raise DeLonghiProtocolError("De'Longhi did not provide an authentication context")
 
             # Step 2: Fetch Gigya session data
             async with self.session.get(
@@ -98,13 +144,13 @@ class DeLonghiAPI:
                     "sdkBuild": SDK_BUILD,
                     "format": "json",
                 },
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
-                data = await response.text()
-                data = json.loads(data)
+                data = await self._read_json(response)
 
-            ucid = data["ucid"]
-            gmid = data["gmid"]
-            gmid_ticket = data["gmidTicket"]
+            ucid = self._require_string(data, "ucid")
+            gmid = self._require_string(data, "gmid")
+            gmid_ticket = self._require_string(data, "gmidTicket")
 
             # Step 3: Login
             risk_context_json = json.dumps(
@@ -174,17 +220,18 @@ class DeLonghiAPI:
                     "sdkBuild": SDK_BUILD,
                     "format": "json",
                 },
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
-                login_data = await response.text()
-                login_data = json.loads(login_data)
+                login_data = await self._read_json(response)
 
+            if not isinstance(login_data, dict):
+                raise DeLonghiProtocolError("De'Longhi returned an invalid login response")
             if login_data.get("statusCode") != 200:
-                _LOGGER.error(
-                    "Login failed: %s", login_data.get("errorDetails", "Unknown error")
-                )
-                return None
+                if login_data.get("errorCode") in (403042, 403043):
+                    raise DeLonghiAuthenticationError("De'Longhi rejected the account credentials")
+                raise DeLonghiProtocolError("De'Longhi login could not be completed")
 
-            login_token = login_data["sessionInfo"]["login_token"]
+            login_token = self._require_string(login_data["sessionInfo"], "login_token")
 
             # Step 4: Get user info
             async with self.session.post(
@@ -202,12 +249,12 @@ class DeLonghiAPI:
                     "sdkBuild": SDK_BUILD,
                     "format": "json",
                 },
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
-                user_data = await response.text()
-                user_data = json.loads(user_data)
+                user_data = await self._read_json(response)
 
-            user_uid = user_data["UID"]
-            user_uid_signature = user_data["UIDSignature"]
+            user_uid = self._require_string(user_data, "UID")
+            user_uid_signature = self._require_string(user_data, "UIDSignature")
             user_signature_timestamp = user_data["signatureTimestamp"]
 
             # Step 5: Consent
@@ -223,12 +270,13 @@ class DeLonghiAPI:
                     "UIDSignature": user_uid_signature,
                     "signatureTimestamp": user_signature_timestamp,
                 },
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
+                self._check_status(response)
                 consent_text = await response.text()
 
-            if not (match := _CONSENT_SIG_RE.search(consent_text)):
-                _LOGGER.error("Consent signature not found in consent page")
-                return None
+            if not (match := _CONSENT_SIG_RE.search(consent_text)) or not match.group(2):
+                raise DeLonghiProtocolError("Consent signature not found in consent page")
             signature = match.group(2)
 
             # Step 6: Authorization
@@ -252,8 +300,12 @@ class DeLonghiAPI:
                     "gmidTicket": gmid_ticket,
                 },
                 allow_redirects=False,
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
+                self._check_status(response)
                 code = self.get_query_param(response.headers["Location"], "code")
+                if not code:
+                    raise DeLonghiProtocolError("De'Longhi did not provide an authorization code")
 
             # Step 7: Get IDP access token
             async with self.session.post(
@@ -268,11 +320,11 @@ class DeLonghiAPI:
                     "grant_type": "authorization_code",
                     "redirect_uri": "https://google.it",
                 },
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
-                token_data = await response.text()
-                token_data = json.loads(token_data)
+                token_data = await self._read_json(response)
 
-            idp_token = token_data["access_token"]
+            idp_token = self._require_string(token_data, "access_token")
 
             # Step 8: Exchange IDP token for Ayla token
             async with self.session.post(
@@ -283,18 +335,20 @@ class DeLonghiAPI:
                     "app_secret": APP_SECRET,
                     "token": idp_token,
                 },
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
-                ayla_data = await response.text()
-                ayla_data = json.loads(ayla_data)
+                ayla_data = await self._read_json(response)
 
-            self.refresh_token = ayla_data["refresh_token"]
-            return ayla_data["access_token"]
+            access_token = self._require_string(ayla_data, "access_token")
+            self.refresh_token = self._require_string(ayla_data, "refresh_token")
+            return access_token
 
-        except Exception as e:
-            _LOGGER.error("Failed to get access token: %s", e)
-            return None
+        except (aiohttp.ClientError, TimeoutError):
+            raise DeLonghiConnectionError("Unable to connect to De'Longhi authentication service") from None
+        except (KeyError, TypeError, ValueError):
+            raise DeLonghiProtocolError("De'Longhi returned an incomplete authentication response") from None
 
-    async def refresh_access_token(self) -> str | None:
+    async def refresh_access_token(self) -> str:
         """Refresh the access token using the refresh token."""
         if not self.refresh_token:
             return await self._get_new_access_token()
@@ -307,49 +361,45 @@ class DeLonghiAPI:
                     "Content-Type": "application/json",
                 },
                 json={"user": {"refresh_token": self.refresh_token}},
+                timeout=_REQUEST_TIMEOUT,
             ) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    new_access_token = data["access_token"]
-                    new_refresh_token = data.get("refresh_token")
-
-                    if new_refresh_token:
-                        self.refresh_token = new_refresh_token
-
-                    return new_access_token
-
-                _LOGGER.warning("Failed to refresh token, falling back to login")
-                return await self._get_new_access_token()
-
-        except Exception as e:
-            _LOGGER.error("Failed to refresh access token: %s", e)
-            return await self._get_new_access_token()
+                if response.status in (401, 403):
+                    return await self._get_new_access_token()
+                data = await self._read_json(response)
+                new_access_token = self._require_string(data, "access_token")
+                if "refresh_token" in data:
+                    self.refresh_token = self._require_string(data, "refresh_token")
+                return new_access_token
+        except (aiohttp.ClientError, TimeoutError):
+            raise DeLonghiConnectionError("Unable to refresh De'Longhi session") from None
+        except (KeyError, TypeError, ValueError):
+            raise DeLonghiProtocolError("De'Longhi returned an incomplete token response") from None
 
     async def get_devices(self) -> list[dict[str, Any]]:
         """Get all devices associated with the account."""
-        if not self.access_token:
-            if not await self.authenticate():
-                return []
+        response = await self._get_request("apiv1/devices.json")
+        if not isinstance(response, list) or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("device"), dict)
+            or not isinstance(item["device"].get("dsn"), str)
+            or not item["device"]["dsn"]
+            for item in response
+        ):
+            raise DeLonghiProtocolError("De'Longhi returned an invalid device list")
+        return response
 
-        try:
-            response = await self._get_request("apiv1/devices.json")
-            return response if isinstance(response, list) else []
-        except Exception as e:
-            _LOGGER.error("Failed to get devices: %s", e)
-            return []
-
-    async def get_device_properties(self, dsn: str) -> dict[str, Any]:
+    async def get_device_properties(self, dsn: str) -> list[dict[str, Any]]:
         """Get device properties by DSN."""
-        if not self.access_token:
-            if not await self.authenticate():
-                return {}
-
-        try:
-            response = await self._get_request(f"apiv1/dsns/{dsn}/properties.json")
-            return response if isinstance(response, list) else []
-        except Exception as e:
-            _LOGGER.error("Failed to get device properties for %s: %s", dsn, e)
-            return []
+        response = await self._get_request(f"apiv1/dsns/{dsn}/properties.json")
+        if not isinstance(response, list) or any(
+            not isinstance(item, dict)
+            or not isinstance(item.get("property"), dict)
+            or not isinstance(item["property"].get("name"), str)
+            or "value" not in item["property"]
+            for item in response
+        ):
+            raise DeLonghiProtocolError("De'Longhi returned an invalid property list")
+        return response
 
     def get_property_value(
         self, properties: list[dict], property_name: str
@@ -362,155 +412,80 @@ class DeLonghiAPI:
 
     async def set_device_mode(self, dsn: str, mode: int) -> bool:
         """Set device mode (1=Cooling, 2=Dehumidification, 3=Fan)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/set_device_mode/datapoints.json",
-                {"datapoint": {"value": mode}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set device mode for %s: %s", dsn, e)
-            return False
+        return await self.set_device_property(dsn, "set_device_mode", mode)
 
     async def set_temperature_setpoint(self, dsn: str, temperature: float) -> bool:
         """Set temperature setpoint (16-32°C)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/set_temp_setpoint/datapoints.json",
-                {"datapoint": {"value": temperature}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set temperature setpoint for %s: %s", dsn, e)
-            return False
+        return await self.set_device_property(dsn, "set_temp_setpoint", temperature)
 
     async def set_status(self, dsn: str, status: int) -> bool:
         """Set device status (1=ON, 2=OFF)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/set_status/datapoints.json",
-                {"datapoint": {"value": status}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set status for %s: %s", dsn, e)
-            return False
+        return await self.set_device_property(dsn, "set_status", status)
 
     async def set_silent_mode(self, dsn: str, status: int) -> bool:
         """Set silent mode (1=ON, 2=OFF)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/set_silent_function/datapoints.json",
-                {"datapoint": {"value": status}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set silent mode for %s: %s", dsn, e)
-            return False
+        return await self.set_device_property(dsn, "set_silent_function", status)
 
     async def set_humidity_setpoint(self, dsn: str, humidity: int) -> bool:
         """Set humidity setpoint (0-100%)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/humidity_setpoint/datapoints.json",
-                {"datapoint": {"value": humidity}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set humidity setpoint for %s: %s", dsn, e)
-            return False
+        return await self.set_device_property(dsn, "humidity_setpoint", humidity)
 
     async def set_fan_speed(self, dsn: str, fan_speed: int) -> bool:
         """Set fan speed (1=Low, 2=Mid, 3=High, 4=Auto)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/set_int_fan_speed/datapoints.json",
-                {"datapoint": {"value": str(fan_speed)}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set fan speed for %s: %s", dsn, e)
-            return False
+        return await self.set_device_property(dsn, "set_int_fan_speed", str(fan_speed))
 
-    async def _get_request(self, path: str) -> dict[str, Any] | None:
+    async def _request(
+        self, method: str, path: str, data: dict[str, Any] | None = None
+    ) -> Any:
+        """Retry an expired session once and propagate sanitized failures."""
+        if not self.access_token:
+            async with self._auth_lock:
+                if not self.access_token:
+                    self.access_token = await self._get_new_access_token()
+        try:
+            for attempt in range(2):
+                token = self.access_token
+                headers = {
+                    "User-Agent": API_USER_AGENT,
+                    "Authorization": f"auth_token {token}",
+                    "Accept": "application/json",
+                }
+                async with self.session.request(
+                    method,
+                    f"https://ads-eu.aylanetworks.com/{path}",
+                    headers=headers,
+                    json=data,
+                    timeout=_REQUEST_TIMEOUT,
+                ) as response:
+                    if response.status != 401 or attempt:
+                        result = await self._read_json(response)
+                        if method == "POST" and not isinstance(result, dict):
+                            raise DeLonghiProtocolError("De'Longhi returned an invalid command response")
+                        return result
+                async with self._auth_lock:
+                    if self.access_token == token:
+                        self.access_token = await self.refresh_access_token()
+        except (aiohttp.ClientError, TimeoutError):
+            raise DeLonghiConnectionError("Unable to communicate with De'Longhi service") from None
+
+    async def _get_request(self, path: str) -> Any:
         """Make a GET request to the API."""
-        url = f"https://ads-eu.aylanetworks.com/{path}"
-        headers = {
-            "User-Agent": API_USER_AGENT,
-            "Authorization": f"auth_token {self.access_token}",
-            "Accept": "application/json",
-        }
-
-        try:
-            async with self.session.get(url, headers=headers) as response:
-                response.raise_for_status()
-                return await response.json()
-        except aiohttp.ClientResponseError as e:
-            if e.status == 401:  # Unauthorized
-                # Try to refresh token and retry
-                self.access_token = await self.refresh_access_token()
-                if self.access_token:
-                    headers["Authorization"] = f"auth_token {self.access_token}"
-                    async with self.session.get(url, headers=headers) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            return None
-        except Exception as e:
-            _LOGGER.error("GET request failed for %s: %s", path, e)
-            return None
+        return await self._request("GET", path)
 
     async def _post_request(
         self, path: str, data: dict[str, Any]
-    ) -> dict[str, Any] | None:
+    ) -> dict[str, Any]:
         """Make a POST request to the API."""
-        url = f"https://ads-eu.aylanetworks.com/{path}"
-        headers = {
-            "User-Agent": API_USER_AGENT,
-            "Authorization": f"auth_token {self.access_token}",
-            "Content-Type": "application/json",
-        }
-
-        try:
-            async with self.session.post(url, headers=headers, json=data) as response:
-                response.raise_for_status()
-                return await response.json()
-        except aiohttp.ClientResponseError as e:
-            if e.status == 401:  # Unauthorized
-                # Try to refresh token and retry
-                self.access_token = await self.refresh_access_token()
-                if self.access_token:
-                    headers["Authorization"] = f"auth_token {self.access_token}"
-                    async with self.session.post(
-                        url, headers=headers, json=data
-                    ) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            return None
-        except Exception as e:
-            _LOGGER.error("POST request failed for %s: %s", path, e)
-            return None
+        return await self._request("POST", path, data)
 
     async def set_device_status(self, dsn: str, status: int) -> bool:
         """Set device status (1=ON, 2=OFF)."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/set_device_status/datapoints.json",
-                {"datapoint": {"value": str(status)}},
-            )
-        except aiohttp.ClientError as e:
-            _LOGGER.error("Failed to set device status for %s: %s", dsn, e)
-            return False
-        else:
-            return response is not None
+        return await self.set_device_property(dsn, "set_device_status", str(status))
 
     async def set_device_property(self, dsn: str, propName: str, value: Any) -> bool:
         """Set a device property by DSN and property name."""
-        try:
-            response = await self._post_request(
-                f"apiv1/dsns/{dsn}/properties/{propName}/datapoints.json",
-                {"datapoint": {"value": value}},
-            )
-            return response is not None
-        except Exception as e:
-            _LOGGER.error("Failed to set device property: %s, %s, %s: %s", dsn, propName, value, e)
-            return False
+        await self._post_request(
+            f"apiv1/dsns/{dsn}/properties/{propName}/datapoints.json",
+            {"datapoint": {"value": value}},
+        )
+        return True

@@ -3,7 +3,14 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
 [![GitHub release](https://img.shields.io/github/release/philm5/delonghi-comfort-integration.svg)](https://github.com/philm5/delonghi-comfort-integration/releases/)
 
-This repository contains a comprehensive Home Assistant integration for De'Longhi Comfort air conditioning and dehumidification devices. The integration provides full control and monitoring capabilities through Home Assistant's user interface.
+This independently maintained fork currently enables only devices reporting
+`oem_model: DL-heater`. Other models, including previously enabled air conditioners
+and dehumidifiers, are skipped rather than exposed with unverified controls.
+Existing account and heater entity unique IDs are preserved.
+
+Authentication failures prompt Home Assistant reauthentication. Network failures
+and unexpected service responses are reported separately, without logging response
+bodies, account credentials, tokens, signatures, or device identifiers.
 
 ## ⚠️ Disclaimer
 
@@ -98,11 +105,12 @@ This integration is based on the excellent work of:
    - **Username**: Your De'Longhi account email
    - **Password**: Your De'Longhi account password
    - **Language**: Select your preferred language/region
-   - **Scan Interval**: Update frequency (default: 60 seconds)
 
 ### Configuration Options
-- **Scan Interval**: How often to poll the API for updates (30-300 seconds)
-- **Device Selection**: Choose which devices to integrate
+- **Scan Interval**: How often to poll the API for updates (5-300 seconds, default: 5).
+  This applies to each supported device; increase it to reduce cloud traffic.
+- Expired credentials can be updated through Home Assistant's reauthentication flow.
+  The existing account entry and entity unique IDs are retained.
 
 ## 🏠 Usage
 

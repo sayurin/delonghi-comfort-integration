@@ -5,10 +5,11 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import DeLonghiAPI
+from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
 from .const import SCAN_INTERVAL, CONF_SCAN_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass,
             _LOGGER,
             name=f"delonghi_comfort_{dsn}",
+            config_entry=config_entry,
             update_interval=timedelta(seconds=scan_interval),
         )
         self.api = api
@@ -45,6 +47,8 @@ class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch data from the API."""
         try:
             properties = await self.api.get_device_properties(self.dsn)
+            if not properties:
+                raise UpdateFailed("De'Longhi returned no device properties")
 
             # Parse properties into a more usable format
             data = {}
@@ -53,8 +57,10 @@ class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     prop_info = prop["property"]
                     data[prop_info["name"]] = prop_info["value"]
 
-        except Exception as err:
-            raise UpdateFailed(f"Error communicating with API: {err}") from err
+        except DeLonghiAuthenticationError as err:
+            raise ConfigEntryAuthFailed(str(err)) from None
+        except DeLonghiError as err:
+            raise UpdateFailed(str(err)) from None
         else:
             return data
 
@@ -63,8 +69,8 @@ class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return DeviceInfo(
             identifiers={(DOMAIN, self.dsn)},
             manufacturer="De'Longhi",
-            model=self.data.get("appliance_model"),
+            model=self.data.get("appliance_model") or self.device_model,
             name=self.device_name,
             hw_version=self.data.get("hardware_version"),
-            sw_version=f"Fireware MDH:{self.data.get('firmware_version')} / Wi-Fi Module:{self.data.get('mcu_host_version')}",
+            sw_version=self.device_version,
         )

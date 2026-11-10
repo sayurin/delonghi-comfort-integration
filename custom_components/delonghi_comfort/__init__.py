@@ -4,6 +4,11 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryError,
+    ConfigEntryNotReady,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
@@ -13,15 +18,15 @@ from .const import (
     CONF_LANGUAGE,
     CONF_SCAN_INTERVAL,
     DEFAULT_LANGUAGE,
+    SUPPORTED_MODELS,
 )
-from .api import DeLonghiAPI
+from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
 from .coordinator import DeLonghiCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
-    Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
@@ -37,36 +42,45 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_get_clientsession(hass)
     api = DeLonghiAPI(username, password, session, language)
 
-    # Test authentication
-    if not await api.authenticate():
-        _LOGGER.error("Failed to authenticate with De'Longhi API")
-        return False
-
-    # Get devices
-    devices = await api.get_devices()
+    try:
+        await api.authenticate()
+        devices = await api.get_devices()
+    except DeLonghiAuthenticationError as err:
+        raise ConfigEntryAuthFailed(str(err)) from None
+    except DeLonghiError as err:
+        raise ConfigEntryNotReady(str(err)) from None
     if not devices:
-        _LOGGER.error("No devices found")
-        return False
+        raise ConfigEntryNotReady("No De'Longhi devices found on the account")
+
+    supported_devices = [
+        device for device in devices
+        if device["device"].get("oem_model") in SUPPORTED_MODELS
+    ]
+    unsupported_count = len(devices) - len(supported_devices)
+    if unsupported_count:
+        _LOGGER.warning(
+            "Skipping %s unsupported De'Longhi device(s); only DL-heater is supported",
+            unsupported_count,
+        )
+    if not supported_devices:
+        raise ConfigEntryError("No supported De'Longhi devices found; only DL-heater is supported")
 
     # Create coordinators for each device
     coordinators = []
     heater_coordinators = []
-    for device in devices:
+    for device in supported_devices:
         device_info = device["device"]
         dsn = device_info["dsn"]
 
         coordinator = DeLonghiCoordinator(hass, api, dsn, device_info, entry)
         await coordinator.async_config_entry_first_refresh()
-        if device_info["oem_model"] == "DL-heater":
-            heater_coordinators.append(coordinator)
-        else:
-            coordinators.append(coordinator)
+        heater_coordinators.append(coordinator)
 
     # Store API instance, devices, and coordinators in hass data
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
         "api": api,
-        "devices": devices,
+        "devices": supported_devices,
         "coordinators": coordinators,
         "heater_coordinators": heater_coordinators,
     }

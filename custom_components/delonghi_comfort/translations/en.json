@@ -10,6 +10,13 @@
           "username": "Email",
           "password": "Password",
           "language": "Language"
+        },
+        "reauth_confirm": {
+          "title": "Reconnect De'Longhi Comfort",
+          "description": "Enter the current password for this account.",
+          "data": {
+            "password": "Password"
+          }
         }
       }
     },
@@ -17,13 +24,19 @@
       "invalid_auth": "Invalid authentication credentials",
       "cannot_connect": "Failed to connect to De'Longhi servers",
       "no_devices": "No devices found on your account",
-      "unknown": "Unexpected error occurred"
+      "unknown": "Unexpected error occurred",
+      "unexpected_response": "De'Longhi returned an unexpected response. Check for an integration update.",
+      "unsupported_devices": "No supported devices found. Only DL-heater devices are currently supported."
     },
     "abort": {
-      "already_configured": "Account is already configured"
+      "already_configured": "Account is already configured",
+      "reauth_successful": "Authentication was updated successfully"
     }
   },
   "options": {
+    "error": {
+      "invalid_scan_interval": "Enter an update interval between 5 and 300 seconds"
+    },
     "step": {
       "init": {
         "title": "De'Longhi Comfort Options",
