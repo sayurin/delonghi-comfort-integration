@@ -87,11 +87,7 @@ Offline tests do not replace hardware checks.
 Releases use Conventional Commits (`fix:`, `feat:`, `feat!:` with breaking-change
 details). Every push to `main` maintains a release-please PR with version/CHANGELOG
 updates. `version.txt`, the release manifest and integration version stay aligned.
-The existing release-tag baseline is 0.1.1; the next release is 0.2.0.
 Use `ci:` or `chore:` for automation-only changes, not `feat:`.
-The configured `last-release-sha` is a migration history boundary: older changes
-are summarized in the 0.2.0 notes. Subsequent releases use their newer release
-commits as usual; this boundary does not pin the release version.
 
 Use Conventional Commits for **PR titles** too, for example
 `fix: handle expired sessions`, `feat: add a heater sensor`, or
