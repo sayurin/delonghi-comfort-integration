@@ -6,6 +6,7 @@
       "release-type": "simple",
       "include-component-in-tag": false,
       "draft": true,
+      "force-tag-creation": true,
       "extra-files": [
         {
           "type": "json",

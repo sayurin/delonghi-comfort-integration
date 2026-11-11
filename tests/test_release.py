@@ -171,6 +171,7 @@ class ReleaseTests(unittest.TestCase):
         )
         config = json.loads((ROOT / "release-please-config.json").read_text())
         self.assertTrue(config["packages"]["."]["draft"])
+        self.assertTrue(config["packages"]["."]["force-tag-creation"])
         self.assertFalse(config["packages"]["."]["include-component-in-tag"])
         self.assertEqual(
             config["packages"]["."]["extra-files"],
