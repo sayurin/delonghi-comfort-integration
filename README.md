@@ -73,11 +73,43 @@ On 2026-11-10, the maintainer reported successful real-device checks on
 brightness, Eco and child lock after the consent-signature fix. The rebuilt
 integration was then checked after Core startup: display, operation and
 integration reload were confirmed working. This is not a claim of testing every
-`DL-heater` variant, nor a real-device recheck after normalizing the preset and
-power-level values. Credential expiry and communication-loss recovery have
-offline tests but have not been verified against the real service/device.
-Test fixtures are synthetic, based on the existing implementation, not captured
-device responses.
+`DL-heater` variant.
+
+On 2026-11-11, the maintainer confirmed English and Japanese operation and
+provided account-wide and individual-device diagnostics. The account contained
+two DL-heater devices, reporting `MDH Wifi` (firmware 2.5 / hardware 0.0) and
+`MDH15 Wifi` (firmware 5.6 / hardware 3.0). Both expose the same 32 property
+names. Device-specific captures match the corresponding account-wide values.
+These API model names are not a claim of two independently verified retail
+model numbers.
+
+Sanitized hardware-derived fixtures are stored in
+`tests/fixtures/mdh_wifi_properties.json` and
+`tests/fixtures/mdh15_wifi_properties.json`, alongside the original synthetic
+`heater_properties.json`. The hardware fixtures retain property names, numeric
+types, nulls and model/version information. Cloud identifiers/metadata are
+omitted; populated schedules and saved setpoints are replaced with
+`**REDACTED**`. `DUMMY__DUMMY` is the actual returned serial-number value, not
+an anonymization performed here. The original captures remain local in ignored
+`log/`; they are not distribution files.
+
+Room temperatures in these captures are integers; target temperatures support
+0.5 C steps. The maintainer interprets `set_power_level` as the permitted maximum,
+not the current output. The captured values differ (`set_power_level=5` versus
+`current_power_level=1` on one device), so they must not be treated as equivalent.
+The current climate UI still displays current output while its command sets
+the limit; separating these surfaces is pending a dedicated design change.
+
+The app's weekly mode schedule is intentionally not exposed as an HA control;
+HA automations can express schedules independently. Its binary encoding and the
+separate OFF timer's property mapping remain unverified. Alarm flags and
+temperature-unit enum meanings are also unverified, so no controls or named
+alarm entities are inferred from the captures.
+
+The supplied runtime log records one transient service failure followed by a
+successful poll about five seconds later. This is observed recovery, not an
+intentional outage test. Real-service credential expiry and controlled
+communication-loss recovery remain unverified.
 
 Additional models require documented properties and capabilities, sanitized test
 fixtures, regression tests and an explicit record of hardware-tested versus
