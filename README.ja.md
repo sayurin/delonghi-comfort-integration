@@ -83,7 +83,6 @@ CI は HA 最低版・最新版のテスト、hassfest、旧名称の HACS valid
 コミットは Conventional Commits（`fix:`、`feat:`、破壊的変更は `feat!:` と説明）を使います。
 `main` への push で release-please がバージョン・CHANGELOG 更新 PR を作成・更新します。
 `version.txt`・リリース管理ファイル・integration のバージョンを同期します。
-既存のリリースタグの基準は 0.1.1、次のリリースは 0.2.0 です。
 自動化だけの変更には `feat:` ではなく `ci:` または `chore:` を使います。
 
 **PR タイトルも Conventional Commits 形式**にします。
