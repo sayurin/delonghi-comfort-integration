@@ -86,17 +86,11 @@ Offline tests do not replace hardware checks.
 
 Releases use Conventional Commits (`fix:`, `feat:`, `feat!:` with breaking-change
 details). Every push to `main` maintains a release-please PR with version/CHANGELOG
-updates. `version.txt`, the release manifest and integration version stay aligned;
-the starting baseline is 1.0.0 after the previous cleanup merge, without rewriting
-history or changing the integration version in this migration.
+updates. `version.txt`, the release manifest and integration version stay aligned.
+The existing release-tag baseline is 0.1.1; the next release is 0.2.0.
+Use `ci:` or `chore:` for automation-only changes, not `feat:`.
 
-Install a GitHub App on this repository with **Contents, Pull requests and Issues:
-read/write**. Set Actions variable `APP_ID` and secret `APP_PRIVATE_KEY`.
-Missing configuration fails explicitly. The App token lets release PRs trigger CI.
-
-While `DELONGHI_RELEASE_APPROVED` is not `true`, only PR maintenance runs.
-**Do not merge the release PR until clearance is complete.** Then enable that
-variable and merge the release PR: release-please creates a draft Release, and a
+Merging the release PR creates a draft Release, and a
 separate job tests its immutable commit, verifies versions and attaches the single
 Marketplace ZIP (with LICENSE/NOTICE). GitHub supplies source archives automatically.
 If packaging fails, use **Re-run failed jobs** on that run. Never publish a failed

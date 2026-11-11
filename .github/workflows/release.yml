@@ -42,11 +42,6 @@ jobs:
         with:
           token: ${{ steps.app.outputs.token }}
           target-branch: main
-          # Keep maintaining the PR while publication is on hold.
-          skip-github-release: ${{ vars.DELONGHI_RELEASE_APPROVED != 'true' }}
-      - name: Report release hold
-        if: vars.DELONGHI_RELEASE_APPROVED != 'true'
-        run: echo "::notice::Release PR maintenance only. Resolve NOTICE/API prerequisites before enabling DELONGHI_RELEASE_APPROVED and merging the release PR."
 
   package:
     needs: release

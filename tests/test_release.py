@@ -160,7 +160,7 @@ class ReleaseTests(unittest.TestCase):
                 self.git("add", str(path.relative_to(self.repository)))
                 self.commit()
 
-    def test_release_configuration_and_hold_are_consistent(self):
+    def test_release_configuration_keeps_publication_manual(self):
         manifest = json.loads(
             (ROOT / "custom_components/delonghi_comfort/manifest.json").read_text()
         )
@@ -184,10 +184,8 @@ class ReleaseTests(unittest.TestCase):
         )
         steps = WORKFLOW["jobs"]["release"]["steps"]
         release = next(step for step in steps if step.get("id") == "release")
-        self.assertEqual(
-            release["with"]["skip-github-release"],
-            "${{ vars.DELONGHI_RELEASE_APPROVED != 'true' }}",
-        )
+        self.assertNotIn("skip-github-release", release["with"])
+        self.assertNotIn("DELONGHI_RELEASE_APPROVED", json.dumps(WORKFLOW))
         hacs = json.loads((ROOT / "hacs.json").read_text())
         self.assertTrue(hacs["zip_release"])
         self.assertEqual(hacs["filename"], self.archive.name)
