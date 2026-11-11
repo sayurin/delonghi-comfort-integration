@@ -78,11 +78,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.async_config_entry_first_refresh()
         heater_coordinators.append(coordinator)
 
-    # Store API instance, devices, and coordinators in hass data
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = {
-        "api": api,
-        "devices": supported_devices,
         "heater_coordinators": heater_coordinators,
     }
 

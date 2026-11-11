@@ -1,4 +1,4 @@
-"""Synthetic heater telemetry tests; these are not captured hardware fixtures."""
+"""Synthetic and sanitized hardware-derived heater telemetry tests."""
 
 import json
 from pathlib import Path
@@ -69,6 +69,51 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.temperature.native_value, 20.5)
         self.assertTrue(self.switches[0].is_on)
         self.assertFalse(self.switches[1].is_on)
+        self.assertIsNone(self.climate.extra_state_attributes)
+
+    async def test_hardware_derived_model_fixtures(self):
+        for filename, model, temperature, target, preset, power, action in (
+            ("mdh_wifi_properties.json", "MDH Wifi", 21, 20.0,
+             "night_mode", "20", HVACAction.IDLE),
+            ("mdh15_wifi_properties.json", "MDH15 Wifi", 23, 24.0,
+             "day_mode", "100", HVACAction.HEATING),
+        ):
+            with self.subTest(model=model):
+                properties = json.loads(
+                    (Path(__file__).parent / "fixtures" / filename).read_text()
+                )
+                self.assertEqual(len(properties), 32)
+                self.coordinator.api.get_device_properties = AsyncMock(
+                    return_value=properties
+                )
+                self.coordinator.data = await DeLonghiCoordinator._async_update_data(
+                    self.coordinator
+                )
+                self.assertEqual(self.coordinator.data["appliance_model"], model)
+                self.assertEqual(self.coordinator.data["serial_number"], "DUMMY__DUMMY")
+                self.assertIsNone(self.coordinator.data["set_temp_unit"])
+                self.assertEqual(self.climate.native_current_temperature, temperature)
+                self.assertEqual(self.climate.native_target_temperature, target)
+                self.assertEqual(self.climate.preset_mode, preset)
+                self.assertEqual(self.climate.fan_mode, power)
+                self.assertEqual(self.climate.hvac_action, action)
+                self.assertEqual(self.coordinator.data["set_power_level"], 5)
+                self.assertFalse(self.switches[0].is_on)
+                self.assertFalse(self.switches[1].is_on)
+                self.assertEqual(self.brightness.current_option, "Level 1")
+                info = DeLonghiCoordinator.get_device_info(self.coordinator)
+                self.assertEqual(info["model"], model)
+                self.assertEqual(info["hw_version"],
+                                 self.coordinator.data["hardware_version"])
+
+    async def test_half_degree_setpoints_cover_full_supported_range(self):
+        for half_degrees in range(20, 57):
+            temperature = half_degrees / 2
+            await self.climate.async_set_temperature(temperature=temperature)
+            self.coordinator.api.set_device_property.assert_awaited_with(
+                "test-dsn", "temperature_setpoint", temperature
+            )
+        self.assertEqual(self.coordinator.async_request_refresh.await_count, 37)
 
     async def test_platform_setup_creates_only_heater_entities(self):
         hass = MagicMock()

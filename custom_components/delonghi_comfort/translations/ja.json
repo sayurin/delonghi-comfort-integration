@@ -1,0 +1,92 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "De'Longhi Comfort",
+        "description": "De'Longhi アカウントの認証情報を入力してください。",
+        "data": {
+          "username": "メールアドレス",
+          "password": "パスワード",
+          "language": "言語"
+        }
+      },
+      "reauth_confirm": {
+        "title": "De'Longhi Comfort の再認証",
+        "description": "このアカウントの現在のパスワードを入力してください。",
+        "data": {
+          "password": "パスワード"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "認証情報が正しくありません。",
+      "cannot_connect": "De'Longhi のサーバーに接続できませんでした。",
+      "no_devices": "アカウントに登録されたデバイスがありません。",
+      "unexpected_response": "De'Longhi から予期しない応答が返されました。インテグレーションの更新を確認してください。",
+      "unsupported_devices": "対応デバイスが見つかりません。現在は DL-heater のみ対応しています。"
+    },
+    "abort": {
+      "already_configured": "このアカウントは設定済みです。",
+      "reauth_successful": "認証情報を更新しました。"
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_scan_interval": "更新間隔は 5 ～ 300 秒で指定してください。"
+    },
+    "step": {
+      "init": {
+        "title": "De'Longhi Comfort のオプション",
+        "description": "De'Longhi Comfort のオプションを設定してください。",
+        "data": {
+          "scan_interval": "更新間隔（秒）"
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "heater": {
+        "name": "ヒーター",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "day_mode": "日中モード",
+              "night_mode": "夜間モード",
+              "antifrost": "凍結防止",
+              "manual": "手動"
+            }
+          },
+          "fan_mode": {
+            "state": {
+              "0": "0%",
+              "20": "20%",
+              "40": "40%",
+              "60": "60%",
+              "80": "80%",
+              "100": "100%"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "temperature": {
+        "name": "温度"
+      }
+    },
+    "select": {
+      "brightness": {
+        "name": "ディスプレイの明るさ"
+      }
+    },
+    "switch": {
+      "eco": {
+        "name": "エコ"
+      },
+      "lock": {
+        "name": "チャイルドロック"
+      }
+    }
+  }
+}

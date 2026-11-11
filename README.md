@@ -73,11 +73,43 @@ On 2026-11-10, the maintainer reported successful real-device checks on
 brightness, Eco and child lock after the consent-signature fix. The rebuilt
 integration was then checked after Core startup: display, operation and
 integration reload were confirmed working. This is not a claim of testing every
-`DL-heater` variant, nor a real-device recheck after normalizing the preset and
-power-level values. Credential expiry and communication-loss recovery have
-offline tests but have not been verified against the real service/device.
-Test fixtures are synthetic, based on the existing implementation, not captured
-device responses.
+`DL-heater` variant.
+
+On 2026-11-11, the maintainer confirmed English and Japanese operation and
+provided account-wide and individual-device diagnostics. The account contained
+two DL-heater devices, reporting `MDH Wifi` (firmware 2.5 / hardware 0.0) and
+`MDH15 Wifi` (firmware 5.6 / hardware 3.0). Both expose the same 32 property
+names. Device-specific captures match the corresponding account-wide values.
+These API model names are not a claim of two independently verified retail
+model numbers.
+
+Sanitized hardware-derived fixtures are stored in
+`tests/fixtures/mdh_wifi_properties.json` and
+`tests/fixtures/mdh15_wifi_properties.json`, alongside the original synthetic
+`heater_properties.json`. The hardware fixtures retain property names, numeric
+types, nulls and model/version information. Cloud identifiers/metadata are
+omitted; populated schedules and saved setpoints are replaced with
+`**REDACTED**`. `DUMMY__DUMMY` is the actual returned serial-number value, not
+an anonymization performed here. The original captures remain local in ignored
+`log/`; they are not distribution files.
+
+Room temperatures in these captures are integers; target temperatures support
+0.5 C steps. The maintainer interprets `set_power_level` as the permitted maximum,
+not the current output. The captured values differ (`set_power_level=5` versus
+`current_power_level=1` on one device), so they must not be treated as equivalent.
+The current climate UI still displays current output while its command sets
+the limit; separating these surfaces is pending a dedicated design change.
+
+The app's weekly mode schedule is intentionally not exposed as an HA control;
+HA automations can express schedules independently. Its binary encoding and the
+separate OFF timer's property mapping remain unverified. Alarm flags and
+temperature-unit enum meanings are also unverified, so no controls or named
+alarm entities are inferred from the captures.
+
+The supplied runtime log records one transient service failure followed by a
+successful poll about five seconds later. This is observed recovery, not an
+intentional outage test. Real-service credential expiry and controlled
+communication-loss recovery remain unverified.
 
 Additional models require documented properties and capabilities, sanitized test
 fixtures, regression tests and an explicit record of hardware-tested versus
@@ -135,6 +167,49 @@ logo or an indication of endorsement.
 - Account credentials, API tokens, signatures, response bodies and device
   identifiers must not be included in logs or issue reports. Even when reporting
   an exception, review it and remove identifying information first.
+
+### Diagnostics and fixture collection
+
+**Attribute migration:** the climate entity no longer copies all raw cloud
+properties into `extra_state_attributes`. Use the normal climate attributes and
+dedicated entities in automations; use diagnostics for property inspection.
+Templates referencing raw attributes such as `device_mode`, `get_eco` or
+`current_power_level` must be updated. Standard `preset_mode`, `fan_mode`,
+temperature and HVAC attributes remain available.
+
+Download diagnostics from the existing De'Longhi Comfort account entry under
+**Settings > Devices & services**. Each request authenticates and fetches all
+devices currently registered to that account, including unsupported models,
+then reads their properties. No device is controlled or registered by diagnostics,
+and unsupported models are not polled during normal operation. An account with
+only unsupported models still cannot be configured.
+
+The device-specific diagnostics download fetches **only that device's
+properties**, without downloading the account device list or properties of
+other devices. Model/version information comes from HA's device registry;
+the support flag is `null` when the OEM model is not available there.
+
+The integration's diagnostics `data.devices` contains anonymous device indices,
+model information, a `supported` flag and fixture-shaped `properties` lists.
+Credentials, tokens, DSNs, device names, cloud metadata and sensitive properties
+are excluded or redacted. Unknown text values are conservatively redacted;
+numeric values and numeric strings remain, along with model/version text for
+explicitly allowed fields. Do not treat this as a complete raw API response.
+Review the **entire downloaded file**, including HA's surrounding metadata,
+before sharing it or committing extracted fixtures.
+
+A device retrieval failure is recorded as `error` instead of an empty successful
+property list; other devices remain in the output. Authentication/account-wide
+failures abort the download. Diagnostics make additional cloud requests and may
+take up to the API timeout per device; request them only when needed.
+Extract the relevant `properties` list into a reviewed fixture and record its
+model, collection date and validation scope. Downloading diagnostics alone does
+not establish that controls on an unsupported model work.
+
+Japanese UI translations are included. The account's **Language** setting is
+sent to the vendor authentication flow; HA's user-interface language determines
+the local labels. Existing entity unique IDs and raw mode/option values remain
+unchanged. Existing registry names are not forcibly renamed.
 
 Report reproducible problems using the
 [issue tracker](https://github.com/sayurin/delonghi-comfort-integration/issues).

@@ -31,7 +31,7 @@ class HeaterBrightness(CoordinatorEntity, SelectEntity):
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:brightness-6"
-    _attr_name = "Display brightness"
+    _attr_translation_key = "brightness"
     _attr_options = ["Level 1", "Level 2", "Level 3"]
 
     def __init__(self, coordinator) -> None:
