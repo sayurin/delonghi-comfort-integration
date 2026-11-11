@@ -73,17 +73,16 @@ protect HA configuration, backups and logs.
 
 ## Development and releases
 
-From `hass-dev` (stop HA before bootstrap/branch changes):
+Use Python 3.14 in a virtual environment. From this repository's root:
 
 ```bash
-bash scripts/hass-dev.sh bootstrap
-bash scripts/hass-dev.sh run delonghi python -m unittest discover -s tests -v
-bash scripts/hass-dev.sh hass
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
 ```
 
-Use the shared Core venv/symlink, not an ECHONET worktree set. CI tests minimum/latest
-HA, hassfest and the legacy-named HACS validator. Offline tests do not replace
-hardware checks.
+For runtime checks, install the integration in a separate Home Assistant test
+instance. CI tests minimum/latest HA, hassfest and the legacy-named HACS validator.
+Offline tests do not replace hardware checks.
 
 Releases use Conventional Commits (`fix:`, `feat:`, `feat!:` with breaking-change
 details). Every push to `main` maintains a release-please PR with version/CHANGELOG

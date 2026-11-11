@@ -69,15 +69,14 @@ Config Entry への保存は暗号化を保証しません。設定・バック�
 
 ## 開発・リリース
 
-`hass-dev` から実行します（bootstrap・ブランチ切替前に HA を停止）。
+Python 3.14 の仮想環境で、このリポジトリのルートから実行します。
 
 ```bash
-bash scripts/hass-dev.sh bootstrap
-bash scripts/hass-dev.sh run delonghi python -m unittest discover -s tests -v
-bash scripts/hass-dev.sh hass
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
 ```
 
-Core の共有 venv と symlink を使用し、ECHONET の worktree セットには含めません。
+起動確認は、独立した Home Assistant のテスト環境へ integration を導入して行います。
 CI は HA 最低版・最新版のテスト、hassfest、旧名称の HACS validator を実行します。
 オフラインテストは実機確認の代わりにはなりません。
 
