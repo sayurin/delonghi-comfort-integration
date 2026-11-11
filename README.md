@@ -1,301 +1,119 @@
 # De'Longhi Comfort for Home Assistant
 
+[日本語](README.ja.md) |
 [![Validate](https://github.com/sayurin/delonghi-comfort-integration/actions/workflows/validate.yml/badge.svg)](https://github.com/sayurin/delonghi-comfort-integration/actions/workflows/validate.yml)
 
-An independently maintained custom integration for De'Longhi Multi Dynamic
-Heaters, derived from
-[philm5/delonghi-comfort-integration](https://github.com/philm5/delonghi-comfort-integration).
-Upstream contributions remain welcome, but this fork does not require upstream
-approval to maintain its own changes.
+An independently maintained fork of
+[philm5/delonghi-comfort-integration](https://github.com/philm5/delonghi-comfort-integration)
+for De'Longhi Multi Dynamic Heaters. Requires **Home Assistant 2026.11.0+**,
+a De'Longhi Comfort account and internet access.
 
-## Status and supported devices
+**Public releases remain on hold** pending the license/API review below.
+This project is not listed in the Marketplace default catalog. It uses an
+unofficial cloud API that may change or stop working.
 
-**New releases are on hold pending the licensing and API-configuration review
-described below.** A passing CI run does not resolve those questions.
-This project is not advertised as part of the Marketplace default catalog.
+## Features and limits
 
-- Only devices reporting `oem_model: DL-heater` are initialized.
-- Unknown models, including previously enabled air conditioners and
-  dehumidifiers, are skipped with a warning. An account with no supported devices
-  cannot be configured. Existing registrations are not deleted automatically.
-- Legacy non-heater entity implementations and the unused number platform have
-  been removed. Only heater entities are created; adding model support later
-  requires a reviewed implementation rather than re-enabling dormant code.
-- The `delonghi_comfort` domain, account unique IDs and heater entity unique IDs
-  remain unchanged. Back up your HA configuration before upgrading.
-- Minimum Home Assistant: **2026.11.0**. Use the latest stable patch release.
-  Earlier versions are no longer claimed as supported.
-- A De'Longhi Comfort account with registered devices and internet access is
-  required. This integration depends on unofficial cloud API behavior and can
-  stop working if the vendor changes or withdraws that API.
-
-### Heater entities
-
-| Entity | Function |
-| --- | --- |
-| Climate | Heat/off; target temperature 10-28 C in 0.5 C steps |
-| Climate presets | Day mode, Night mode, Antifrost, Manual |
-| Climate power control | Power levels displayed as 0%, 20%, 40%, 60%, 80%, 100% |
-| Temperature sensor | Room temperature |
-| Display brightness select | Level 1, Level 2, Level 3 |
-| Eco and child-lock switches | Enable/disable the corresponding device setting |
-
-These are heater power levels, not a claim that the appliance has a fan.
-Missing or unknown telemetry is reported as unknown rather than inventing a
-valid preset, power level, or off state. Communication failures make entities
-unavailable; failed commands raise a Home Assistant error instead of appearing
-successful.
-
-### Migration: preset and power-level values
-
-**Breaking change:** preset and fan-mode attribute/service values are normalized
-to support Home Assistant's validated custom icons. English UI labels remain
-unchanged, but update automations, scripts, templates and dashboards that use the
-old raw values:
-
-| Attribute | Previous value | New value |
-| --- | --- | --- |
-| `preset_mode` | `Day mode` | `day_mode` |
-| `preset_mode` | `Night mode` | `night_mode` |
-| `preset_mode` | `Antifrost` | `antifrost` |
-| `preset_mode` | `Manual` | `manual` |
-| `fan_mode` | `0%`, `20%`, `40%`, `60%`, `80%`, `100%` | `"0"`, `"20"`, `"40"`, `"60"`, `"80"`, `"100"` |
-
-Use the new values in `climate.set_preset_mode` and `climate.set_fan_mode` calls.
-Power levels are **strings**, so quote them in YAML. Device command numbers and
-entity unique IDs have not changed. The restored preset/power-level icons match
-these new values.
-
-### Hardware validation
-
-On 2026-11-10, the maintainer reported successful real-device checks on
-**MDHAA15WIFI-BK** of readings, power, target temperature, presets, power levels,
-brightness, Eco and child lock after the consent-signature fix. The rebuilt
-integration was then checked after Core startup: display, operation and
-integration reload were confirmed working. This is not a claim of testing every
-`DL-heater` variant.
-
-On 2026-11-11, the maintainer confirmed English and Japanese operation and
-provided account-wide and individual-device diagnostics. The account contained
-two DL-heater devices, reporting `MDH Wifi` (firmware 2.5 / hardware 0.0) and
-`MDH15 Wifi` (firmware 5.6 / hardware 3.0). Both expose the same 32 property
-names. Device-specific captures match the corresponding account-wide values.
-These API model names are not a claim of two independently verified retail
-model numbers.
-
-Sanitized hardware-derived fixtures are stored in
-`tests/fixtures/mdh_wifi_properties.json` and
-`tests/fixtures/mdh15_wifi_properties.json`, alongside the original synthetic
-`heater_properties.json`. The hardware fixtures retain property names, numeric
-types, nulls and model/version information. Cloud identifiers/metadata are
-omitted; populated schedules and saved setpoints are replaced with
-`**REDACTED**`. `DUMMY__DUMMY` is the actual returned serial-number value, not
-an anonymization performed here. The original captures remain local in ignored
-`log/`; they are not distribution files.
-
-Room temperatures in these captures are integers; target temperatures support
-0.5 C steps. The maintainer interprets `set_power_level` as the permitted maximum,
-not the current output. The captured values differ (`set_power_level=5` versus
-`current_power_level=1` on one device), so they must not be treated as equivalent.
-The current climate UI still displays current output while its command sets
-the limit; separating these surfaces is pending a dedicated design change.
-
-The app's weekly mode schedule is intentionally not exposed as an HA control;
-HA automations can express schedules independently. Its binary encoding and the
-separate OFF timer's property mapping remain unverified. Alarm flags and
-temperature-unit enum meanings are also unverified, so no controls or named
-alarm entities are inferred from the captures.
-
-The supplied runtime log records one transient service failure followed by a
-successful poll about five seconds later. This is observed recovery, not an
-intentional outage test. Real-service credential expiry and controlled
-communication-loss recovery remain unverified.
-
-Additional models require documented properties and capabilities, sanitized test
-fixtures, regression tests and an explicit record of hardware-tested versus
-fixture-only behavior before being enabled.
+- Only `DL-heater` devices receive entities: heat/off, 10–28 °C target in 0.5 °C
+  steps, presets, power limit, room temperature, display brightness, Eco and lock.
+- English and Japanese UI. Polling is configurable from **5–300 seconds**,
+  default 5 per device. Expired credentials use HA's reauthentication flow.
+- Power controls currently **set the maximum but display current output**.
+  These may differ during temperature regulation; separating them is pending.
+- Weekly schedules, OFF timers and alarm/unit controls are not exposed.
+  Unknown models receive no controls; unsupported-only accounts cannot be added.
+- Human checks covered MDHAA15WIFI-BK, reload and English/Japanese operation.
+  Sanitized 32-property captures for API models `MDH Wifi` and `MDH15 Wifi` are
+  in `tests/fixtures/`. Not all variants or credential-expiry/recovery paths
+  have real-device validation.
 
 ## Installation
 
-### Marketplace (published ZIP releases)
+After an approved release is **published**:
 
-These steps apply only after an approved release has been published. While
-releases are on hold, use the manual/development method below. Draft releases
-are not public installable versions.
+1. In **Marketplace > overflow menu > Custom repositories**, add
+   `https://github.com/sayurin/delonghi-comfort-integration` as **Integration**.
+2. Install **De'Longhi Comfort** and restart HA.
+3. Under **Settings > Devices & services**, add **De'Longhi Comfort** and enter
+   your account details.
 
-1. Open **Marketplace**, then its overflow menu > **Custom repositories**.
-   Add `https://github.com/sayurin/delonghi-comfort-integration` with category
-   **Integration**.
-2. Select **De'Longhi Comfort**, install a published release and restart Home
-   Assistant. Marketplace downloads the release asset `delonghi_comfort.zip`,
-   not a snapshot of the default branch.
-3. Under **Settings > Devices & services**, add **De'Longhi Comfort**.
-4. Enter your account email, password and language.
+Marketplace uses `delonghi_comfort.zip` via the legacy-named `hacs.json`.
+Draft releases/default-branch snapshots are not installable through this route.
+For manual installation, extract the release ZIP **inside**
+`config/custom_components/delonghi_comfort/`; `manifest.json` is at ZIP root.
+For development, copy that directory from the checkout instead.
+Do not install two integrations with the same `delonghi_comfort` domain.
 
-The repository manifest remains named `hacs.json` for Marketplace compatibility.
-It enables ZIP releases, names the exact asset and hides default-branch installs.
+## Upgrading and diagnostics
 
-### Manual installation and development
+Account/entity unique IDs are preserved. Back up HA before upgrading.
+Update automations/templates that use these old raw climate values:
 
-From a checkout, copy `custom_components/delonghi_comfort` into your
-configuration's `custom_components` directory. From a published release,
-create `custom_components/delonghi_comfort/` and extract `delonghi_comfort.zip`
-**inside it**: `manifest.json` and `__init__.py` are at the ZIP root, without a
-wrapping directory. Alternatively, the full `delonghi-comfort-integration-v<version>.zip`
-contains `custom_components/delonghi_comfort/` plus README, LICENSE and NOTICE.
-Restart HA, add **De'Longhi Comfort** under **Settings > Devices & services**
-and enter your account details. Workspace development uses the symlink described
-below instead of a copy.
+| Previous value | New value |
+| --- | --- |
+| `Day mode`, `Night mode`, `Antifrost`, `Manual` | `day_mode`, `night_mode`, `antifrost`, `manual` |
+| `0%`, `20%`, `40%`, `60%`, `80%`, `100%` | `"0"`, `"20"`, `"40"`, `"60"`, `"80"`, `"100"` |
 
-Do not install this copy alongside another integration using the same domain.
-The generic radiator icon is original AI-assisted artwork, not a manufacturer
-logo or an indication of endorsement.
+Power values are strings: quote them in YAML. English display labels are unchanged.
+Raw cloud `extra_state_attributes` were removed; use standard climate attributes,
+dedicated entities or diagnostics instead. Existing registry names are not
+forcibly renamed. The account language is separate from HA's UI language.
 
-## Configuration and troubleshooting
+Download diagnostics from an account or device menu. Account diagnostics read
+all its devices, including unsupported ones; device diagnostics read only that
+device. Requests do not control/register devices. Identifiers, credentials and
+unknown text are excluded/redacted; numeric telemetry and selected model/version
+text remain. Per-device failures appear as errors; account/authentication failures
+abort the download. Review the **entire file** before sharing or extracting fixtures.
 
-- The polling interval is an option: **5-300 seconds**, default **5 seconds per
-  device**. Increase it to reduce cloud traffic.
-- Expired credentials trigger HA's reauthentication flow. The replacement
-  password is saved to the same entry; account and entity IDs do not change.
-- Authentication failures, connection failures and unexpected API responses are
-  reported separately. An empty successful device list is distinct from an
-  outage.
-- Account credentials are stored in the HA Config Entry, following HA's normal
-  configuration model. That is not a guarantee of encryption. Protect your
-  config directory, backups and logs; do not reuse production credentials in
-  shared development configurations.
-- Account credentials, API tokens, signatures, response bodies and device
-  identifiers must not be included in logs or issue reports. Even when reporting
-  an exception, review it and remove identifying information first.
+Report problems in [Issues](https://github.com/sayurin/delonghi-comfort-integration/issues)
+with versions, model, expected behavior and sanitized logs. Never share credentials,
+tokens, email, DSNs or serials. Config Entry storage is not an encryption guarantee;
+protect HA configuration, backups and logs.
 
-### Diagnostics and fixture collection
+## Development and releases
 
-**Attribute migration:** the climate entity no longer copies all raw cloud
-properties into `extra_state_attributes`. Use the normal climate attributes and
-dedicated entities in automations; use diagnostics for property inspection.
-Templates referencing raw attributes such as `device_mode`, `get_eco` or
-`current_power_level` must be updated. Standard `preset_mode`, `fan_mode`,
-temperature and HVAC attributes remain available.
-
-Download diagnostics from the existing De'Longhi Comfort account entry under
-**Settings > Devices & services**. Each request authenticates and fetches all
-devices currently registered to that account, including unsupported models,
-then reads their properties. No device is controlled or registered by diagnostics,
-and unsupported models are not polled during normal operation. An account with
-only unsupported models still cannot be configured.
-
-The device-specific diagnostics download fetches **only that device's
-properties**, without downloading the account device list or properties of
-other devices. Model/version information comes from HA's device registry;
-the support flag is `null` when the OEM model is not available there.
-
-The integration's diagnostics `data.devices` contains anonymous device indices,
-model information, a `supported` flag and fixture-shaped `properties` lists.
-Credentials, tokens, DSNs, device names, cloud metadata and sensitive properties
-are excluded or redacted. Unknown text values are conservatively redacted;
-numeric values and numeric strings remain, along with model/version text for
-explicitly allowed fields. Do not treat this as a complete raw API response.
-Review the **entire downloaded file**, including HA's surrounding metadata,
-before sharing it or committing extracted fixtures.
-
-A device retrieval failure is recorded as `error` instead of an empty successful
-property list; other devices remain in the output. Authentication/account-wide
-failures abort the download. Diagnostics make additional cloud requests and may
-take up to the API timeout per device; request them only when needed.
-Extract the relevant `properties` list into a reviewed fixture and record its
-model, collection date and validation scope. Downloading diagnostics alone does
-not establish that controls on an unsupported model work.
-
-Japanese UI translations are included. The account's **Language** setting is
-sent to the vendor authentication flow; HA's user-interface language determines
-the local labels. Existing entity unique IDs and raw mode/option values remain
-unchanged. Existing registry names are not forcibly renamed.
-
-Report reproducible problems using the
-[issue tracker](https://github.com/sayurin/delonghi-comfort-integration/issues).
-Include HA/integration versions, the product model, expected/actual behavior and
-sanitized logs. Never include a password, token, email, serial number or DSN.
-
-## Development and validation
-
-Keep integration-specific changes and tests in this repository. Within the
-`hass-dev` development workspace, use its normal Core venv and symlink:
+From `hass-dev` (stop HA before bootstrap/branch changes):
 
 ```bash
-# From hass-dev; stop HA before bootstrap or switching branches.
 bash scripts/hass-dev.sh bootstrap
 bash scripts/hass-dev.sh run delonghi python -m unittest discover -s tests -v
 bash scripts/hass-dev.sh hass
 ```
 
-DeLonghi is independent of the ECHONET Lite worktree sets and generator/release
-workflow; do not combine `run delonghi` with `--set`. Do not install this
-repository's `requirements.txt` over the workspace's Core venv: it already
-provides the checked-out HA. For a standalone environment, `requirements.txt`
-installs HA and its dependencies.
+Use the shared Core venv/symlink, not an ECHONET worktree set. CI tests minimum/latest
+HA, hassfest and the legacy-named HACS validator. Offline tests do not replace
+hardware checks.
 
-Offline tests cover authentication, token refresh, config/reauth/options flows,
-setup and unload, model filtering, coordinator failures, heater telemetry and
-commands, existing IDs, and release archives. They never access an account or
-operate a heater. Unit tests do not replace human hardware checks.
+Releases use Conventional Commits (`fix:`, `feat:`, `feat!:` with breaking-change
+details). Every push to `main` maintains a release-please PR with version/CHANGELOG
+updates. `version.txt`, the release manifest and integration version stay aligned;
+the starting baseline is 1.0.0 after the previous cleanup merge, without rewriting
+history or changing the integration version in this migration.
 
-CI runs those tests against the minimum HA version and latest stable HA,
-plus official hassfest and the legacy-named `hacs/action` repository validator.
-That validator is a structural check, not acceptance into the Marketplace
-default catalog or legal clearance.
+Install a GitHub App on this repository with **Contents, Pull requests and Issues:
+read/write**. Set Actions variable `APP_ID` and secret `APP_PRIVATE_KEY`.
+Missing configuration fails explicitly. The App token lets release PRs trigger CI.
 
-## Releases and unresolved prerequisites
+While `DELONGHI_RELEASE_APPROVED` is not `true`, only PR maintenance runs.
+**Do not merge the release PR until clearance is complete.** Then enable that
+variable and merge the release PR: release-please creates a draft Release, and a
+separate job tests its immutable commit, verifies versions and attaches the single
+Marketplace ZIP (with LICENSE/NOTICE). GitHub supplies source archives automatically.
+If packaging fails, use **Re-run failed jobs** on that run. Never publish a failed
+or asset-less draft. Review assets/notes and **publish manually**. No tag-triggered
+duplicate release workflow is used.
 
-No version bump, tag or release is implied by merging development changes.
-The existing manifest version is retained until a separate release decision.
+Release clearance still requires resolving ECAMpy-derived code permissions
+([NOTICE](NOTICE)), and establishing provenance/permitted use of the fixed
+API/client/app values. Existing public code is not proof of permission.
+Complete remaining hardware checks and a clean Marketplace ZIP installation
+before publication. CI success does not resolve these prerequisites.
 
-Before any independent release:
+## License
 
-1. Resolve the third-party attribution/permission questions in [NOTICE](NOTICE).
-   The integration and `rtfpessoa/delonghi-comfort-client` have Apache-2.0
-   licenses. `duckwc/ECAMpy`, named as a source of authentication code, had no
-   LICENSE file in its public repository when checked on 2026-11-10.
-   Do not assume its code is Apache-2.0 or otherwise cleared for redistribution.
-   Confirm the provenance of the used portions and obtain any required
-   permission or a suitable replacement before release.
-2. Resolve or explicitly document the provenance, permissions and vendor terms
-   for the existing API/client/app configuration values. Their ownership and
-   privilege level are not verified; they cannot currently be rotated by this
-   maintainer. They are distinct from each user's login credentials. They have
-   not been added to fixtures or copied into documentation, and moving them to
-   an environment variable would not establish permission or secrecy. If any
-   value is privileged or its use is not permitted, stop distribution and obtain
-   a permitted authentication method.
-3. Record the exact hardware model and validation scope, check restart/reload,
-   authentication expiry, communication loss and recovery, and review CI results.
-4. Update the manifest version in a reviewed commit and create a matching
-   `v<version>` tag. The release builder reads the tag's committed tree and
-   rejects tag/manifest mismatches; it never rewrites the manifest.
-5. Only after explicit human approval, set the repository Actions variable
-   `DELONGHI_RELEASE_APPROVED` to `true`. Until then the release workflow fails
-   explicitly without publishing anything. The approved workflow creates a
-   **draft** release for final human review, not an automatic public release.
-6. Review both draft assets and publish the approved release manually. Keep
-   `delonghi_comfort.zip` attached with that exact filename for Marketplace;
-   the full archive is for manual installation and attribution review.
-
-The two archives contain only committed integration files and the documented
-license/readme files, not local configuration, test output, bytecode, credentials
-or private planning documents. Release notes are generated from the repository's
-changes rather than claiming untested model support.
-
-## License and acknowledgments
-
-The original integration is distributed under [Apache-2.0](LICENSE).
-Modifications to this fork are offered under the same license, subject to the
-unresolved third-party provenance described above; this does not relicense code
-owned by others. Existing third-party notices are retained in [NOTICE](NOTICE).
-
-Thanks to [philm5](https://github.com/philm5),
-[rtfpessoa/delonghi-comfort-client](https://github.com/rtfpessoa/delonghi-comfort-client),
-[duckwc/ECAMpy](https://github.com/duckwc/ECAMpy) and other contributors.
-Development and the generic brand icon have used AI assistance.
-
-This unofficial integration is provided as-is, without warranty or manufacturer
-endorsement. Review behavior before relying on it; never use it as a substitute
-for an appliance's physical safety controls.
+[Apache-2.0](LICENSE), subject to unresolved third-party provenance in
+[NOTICE](NOTICE); no license is inferred for others' code. Derived from philm5,
+rtfpessoa/delonghi-comfort-client and authentication work attributed to ECAMpy.
+Code and the original generic radiator artwork used AI assistance. Unofficial,
+without manufacturer endorsement or warranty; never replace appliance safety controls.
