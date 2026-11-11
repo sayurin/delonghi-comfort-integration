@@ -86,6 +86,14 @@ CI は HA 最低版・最新版のテスト、hassfest、旧名称の HACS valid
 既存のリリースタグの基準は 0.1.1、次のリリースは 0.2.0 です。
 自動化だけの変更には `feat:` ではなく `ci:` または `chore:` を使います。
 
+**PR タイトルも Conventional Commits 形式**にします。
+例：`fix: handle expired sessions`、`feat: add a heater sensor`、
+`docs: clarify installation`。通常は **Squash and merge** を使い、
+PR タイトルを squash コミットの件名として維持します。
+破壊的変更の説明（`BREAKING CHANGE:`）や意図的な `Release-As:` 指定は、
+最終コミットの本文に残してください。
+コミットの保持を明示的に求める PR では、例外としてマージコミットを使います。
+
 リリース PR をマージすると、ドラフト Release を作成します。
 別 job がその固定コミットをテスト・バージョン検証し、LICENSE・NOTICE を含む
 Marketplace 用 ZIP だけを添付します。ソース一式は GitHub が自動生成します。

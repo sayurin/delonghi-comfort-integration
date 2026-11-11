@@ -90,6 +90,13 @@ updates. `version.txt`, the release manifest and integration version stay aligne
 The existing release-tag baseline is 0.1.1; the next release is 0.2.0.
 Use `ci:` or `chore:` for automation-only changes, not `feat:`.
 
+Use Conventional Commits for **PR titles** too, for example
+`fix: handle expired sessions`, `feat: add a heater sensor`, or
+`docs: clarify installation`. Normally use **Squash and merge**, keeping the PR
+title as the squash commit subject. Preserve breaking-change details
+(`BREAKING CHANGE:`) and any intentional `Release-As:` footer in the final commit
+body; use a merge commit when a PR explicitly requires retaining its commits.
+
 Merging the release PR creates a draft Release, and a
 separate job tests its immutable commit, verifies versions and attaches the single
 Marketplace ZIP (with LICENSE/NOTICE). GitHub supplies source archives automatically.
