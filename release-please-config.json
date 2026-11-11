@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "806b31a945bbe5c6b334bcf10d7f40f2be278a12",
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "include-component-in-tag": false,
+      "draft": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "custom_components/delonghi_comfort/manifest.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

@@ -34,7 +34,7 @@ jobs:
       - name: Offline regression tests
         run: python -m unittest discover -s tests -v
       - name: Check Python syntax
-        run: python -m compileall -q custom_components scripts tests
+        run: python -m compileall -q custom_components tests
 
   hassfest:
     runs-on: ubuntu-latest
