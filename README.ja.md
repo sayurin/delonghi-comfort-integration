@@ -83,17 +83,18 @@ CI は HA 最低版・最新版のテスト、hassfest、旧名称の HACS valid
 コミットは Conventional Commits（`fix:`、`feat:`、破壊的変更は `feat!:` と説明）を使います。
 `main` への push で release-please がバージョン・CHANGELOG 更新 PR を作成・更新します。
 `version.txt`・リリース管理ファイル・integration のバージョンを同期します。
-導入時の基準は前回クリーンアップのマージ後、1.0.0 です。
-今回の移行で過去の履歴や integration のバージョンは変更しません。
+既存のリリースタグの基準は 0.1.1、次のリリースは 0.2.0 です。
+自動化だけの変更には `feat:` ではなく `ci:` または `chore:` を使います。
 
-GitHub App を作成し、このリポジトリへインストールしてください。
-権限は **Contents・Pull requests・Issues の read/write**、
-Actions の変数は `APP_ID`、secret は `APP_PRIVATE_KEY` です。
-未設定時は明示的に失敗します。App トークンにより自動作成 PR の CI も起動します。
+**PR タイトルも Conventional Commits 形式**にします。
+例：`fix: handle expired sessions`、`feat: add a heater sensor`、
+`docs: clarify installation`。通常は **Squash and merge** を使い、
+PR タイトルを squash コミットの件名として維持します。
+破壊的変更の説明（`BREAKING CHANGE:`）や意図的な `Release-As:` 指定は、
+最終コミットの本文に残してください。
+コミットの保持を明示的に求める PR では、例外としてマージコミットを使います。
 
-`DELONGHI_RELEASE_APPROVED` が `true` でなければ PR の保守だけを行います。
-**公開条件を満たすまでリリース PR をマージしないでください。**
-承認後に変数を有効化してリリース PR をマージすると、ドラフト Release を作成します。
+リリース PR をマージすると、ドラフト Release を作成します。
 別 job がその固定コミットをテスト・バージョン検証し、LICENSE・NOTICE を含む
 Marketplace 用 ZIP だけを添付します。ソース一式は GitHub が自動生成します。
 ZIP 作成失敗時は同じ run の **Re-run failed jobs** を使います。
