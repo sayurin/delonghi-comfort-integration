@@ -208,6 +208,14 @@ class ReleaseTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertNotIn("private-test-value", result.stdout + result.stderr)
 
+    def test_existing_tag_history_uses_an_explicit_migration_boundary(self):
+        config = json.loads((ROOT / "release-please-config.json").read_text())
+        self.assertNotIn("bootstrap-sha", config)
+        self.assertEqual(
+            config["last-release-sha"],
+            "7e7549741e1fdbcbd4e70559c494365f847c3949",
+        )
+
     def test_release_event_and_packaging_are_wired_to_one_immutable_commit(self):
         # PyYAML's YAML 1.1 loader treats the unquoted GitHub Actions "on" key as True.
         events = WORKFLOW[True]

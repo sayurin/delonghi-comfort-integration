@@ -85,6 +85,9 @@ CI は HA 最低版・最新版のテスト、hassfest、旧名称の HACS valid
 `version.txt`・リリース管理ファイル・integration のバージョンを同期します。
 既存のリリースタグの基準は 0.1.1、次のリリースは 0.2.0 です。
 自動化だけの変更には `feat:` ではなく `ci:` または `chore:` を使います。
+設定の `last-release-sha` は移行時の履歴の境界です。それ以前の改修は
+0.2.0 のノートに集約します。以後は通常どおり新しいリリースコミットを基準とし、
+リリースバージョンを固定する設定ではありません。
 
 **PR タイトルも Conventional Commits 形式**にします。
 例：`fix: handle expired sessions`、`feat: add a heater sensor`、
