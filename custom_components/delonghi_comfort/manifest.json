@@ -1,7 +1,9 @@
 {
   "domain": "delonghi_comfort",
   "name": "De'Longhi Comfort",
-  "categories": ["climate.thermostats_heating"],
+  "categories": [
+    "climate.thermostats_heating"
+  ],
   "codeowners": [
     "@sayurin"
   ],
@@ -10,5 +12,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/sayurin/delonghi-comfort-integration/issues",
   "requirements": [],
-  "version": "0.2.0"
+  "version": "0.2.1"
 }
