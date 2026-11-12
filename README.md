@@ -1,118 +1,83 @@
 # De'Longhi Comfort for Home Assistant
 
-[日本語](README.ja.md) |
+[![English](https://img.shields.io/badge/lang-en-blue)](README.md)
+[![日本語](https://img.shields.io/badge/lang-ja-lightgrey)](README.ja.md)
 [![Validate](https://github.com/sayurin/delonghi-comfort-integration/actions/workflows/validate.yml/badge.svg)](https://github.com/sayurin/delonghi-comfort-integration/actions/workflows/validate.yml)
+[![License](https://img.shields.io/github/license/sayurin/delonghi-comfort-integration)](https://github.com/sayurin/delonghi-comfort-integration/blob/main/LICENSE)
+[![Version](https://img.shields.io/github/v/release/sayurin/delonghi-comfort-integration)](https://github.com/sayurin/delonghi-comfort-integration/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/sayurin/delonghi-comfort-integration/latest/total)](https://github.com/sayurin/delonghi-comfort-integration/releases/latest)
+[![Stars](https://img.shields.io/github/stars/sayurin/delonghi-comfort-integration?style=flat&color=gold)](https://github.com/sayurin/delonghi-comfort-integration)
 
-An independently maintained fork of
-[philm5/delonghi-comfort-integration](https://github.com/philm5/delonghi-comfort-integration)
-for De'Longhi Multi Dynamic Heaters. Requires **Home Assistant 2026.11.0+**,
-a De'Longhi Comfort account and internet access.
+An unofficial Home Assistant integration for De'Longhi Multi Dynamic Heaters.
+It requires **Home Assistant 2026.11.0 or later**, a De'Longhi Comfort account,
+and an internet connection.
 
-**Public releases remain on hold** pending the license/API review below.
-This project is not listed in the Marketplace default catalog. It uses an
-unofficial cloud API that may change or stop working.
+This integration uses an unofficial cloud API, which may change or stop working.
+It is not affiliated with or endorsed by De'Longhi and is provided without
+warranty. Do not use it as a substitute for the heater's safety controls.
 
-## Features and limits
+## Which De'Longhi integration?
 
-- Only `DL-heater` devices receive entities: heat/off, 10–28 °C target in 0.5 °C
-  steps, presets, power limit, room temperature, display brightness, Eco and lock.
-- English and Japanese UI. Polling is configurable from **5–300 seconds**,
-  default 5 per device. Expired credentials use HA's reauthentication flow.
-- Power controls currently **set the maximum but display current output**.
-  These may differ during temperature regulation; separating them is pending.
-- Weekly schedules, OFF timers and alarm/unit controls are not exposed.
-  Unknown models receive no controls; unsupported-only accounts cannot be added.
-- Human checks covered MDHAA15WIFI-BK, reload and English/Japanese operation.
-  Sanitized 32-property captures for API models `MDH Wifi` and `MDH15 Wifi` are
-  in `tests/fixtures/`. Not all variants or credential-expiry/recovery paths
-  have real-device validation.
+Both integrations appear in Home Assistant as **De'Longhi Comfort**, but they
+support different apps. This repository supports the original
+**De'Longhi Comfort** app. The standard Marketplace listing
+[comfort-hub/delonghi-comfort-ha](https://github.com/comfort-hub/delonghi-comfort-ha)
+also calls itself **De'Longhi Comfort**, but despite the name, it does not
+support the **De'Longhi Comfort** app; it supports the newer **My Comfort Hub**
+app instead. They are not interchangeable, and both cannot be installed at the
+same time because they use the same integration domain. Check which app an
+integration supports before installing it.
+
+## Features and limitations
+
+- Controls supported `DL-heater` devices: heat/off, target temperature from
+  10–28 °C in 0.5 °C steps, presets, power limit, room temperature, display
+  brightness, Eco mode, and child lock.
+- English and Japanese translations are included. Polling is configurable from
+  **5 to 300 seconds** (60 seconds by default per device). Expired credentials
+  can be renewed through Home Assistant's reauthentication flow.
+- Power controls set the maximum output; the displayed output is the current
+  value and may be lower while the heater regulates the temperature.
+- Weekly schedules, OFF timers, alarms, and temperature-unit controls are not
+  available in Home Assistant. Use the app or heater controls for these
+  functions. Unsupported models do not receive controls, and setup is not
+  available for accounts containing only unsupported models.
+- Hardware testing has been performed with the MDHAA15WIFI-BK. Other models
+  and credential-expiry/recovery scenarios have not all been tested with
+  physical devices.
 
 ## Installation
 
-After an approved release is **published**:
+This integration is not included in the Marketplace's standard catalog. To
+install it through Home Assistant's built-in **Marketplace**, add it as a custom
+repository:
 
-1. In **Marketplace > overflow menu > Custom repositories**, add
-   `https://github.com/sayurin/delonghi-comfort-integration` as **Integration**.
-2. Install **De'Longhi Comfort** and restart HA.
-3. Under **Settings > Devices & services**, add **De'Longhi Comfort** and enter
-   your account details.
+1. Open **Marketplace > Integrations** and choose **Custom repositories**.
+2. Add `https://github.com/sayurin/delonghi-comfort-integration` as an
+   **Integration**.
+3. Install **De'Longhi Comfort** and restart Home Assistant if prompted.
+4. Go to **Settings > Devices & services > Add integration**, select
+   **De'Longhi Comfort**, and enter your account details.
 
-Marketplace uses `delonghi_comfort.zip` via the legacy-named `hacs.json`.
-Draft releases/default-branch snapshots are not installable through this route.
-For manual installation, extract the release ZIP **inside**
-`config/custom_components/delonghi_comfort/`; `manifest.json` is at ZIP root.
-For development, copy that directory from the checkout instead.
-Do not install two integrations with the same `delonghi_comfort` domain.
+Do not install this integration alongside another integration with the
+`delonghi_comfort` domain.
 
-## Upgrading and diagnostics
+## Diagnostics and support
 
-Account/entity unique IDs are preserved. Back up HA before upgrading.
-Update automations/templates that use these old raw climate values:
+Download diagnostics from an account or device menu. Account diagnostics include
+all devices on the account; device diagnostics include only the selected device.
+Diagnostics do not control or register devices. Identifiers, credentials, and
+unrecognized text are excluded or redacted, but numeric telemetry and selected
+model/version text remain. Review the entire file before sharing it.
 
-| Previous value | New value |
-| --- | --- |
-| `Day mode`, `Night mode`, `Antifrost`, `Manual` | `day_mode`, `night_mode`, `antifrost`, `manual` |
-| `0%`, `20%`, `40%`, `60%`, `80%`, `100%` | `"0"`, `"20"`, `"40"`, `"60"`, `"80"`, `"100"` |
-
-Power values are strings: quote them in YAML. English display labels are unchanged.
-Raw cloud `extra_state_attributes` were removed; use standard climate attributes,
-dedicated entities or diagnostics instead. Existing registry names are not
-forcibly renamed. The account language is separate from HA's UI language.
-
-Download diagnostics from an account or device menu. Account diagnostics read
-all its devices, including unsupported ones; device diagnostics read only that
-device. Requests do not control/register devices. Identifiers, credentials and
-unknown text are excluded/redacted; numeric telemetry and selected model/version
-text remain. Per-device failures appear as errors; account/authentication failures
-abort the download. Review the **entire file** before sharing or extracting fixtures.
-
-Report problems in [Issues](https://github.com/sayurin/delonghi-comfort-integration/issues)
-with versions, model, expected behavior and sanitized logs. Never share credentials,
-tokens, email, DSNs or serials. Config Entry storage is not an encryption guarantee;
-protect HA configuration, backups and logs.
-
-## Development and releases
-
-Use Python 3.14 in a virtual environment. From this repository's root:
-
-```bash
-python -m pip install -r requirements.txt
-python -m unittest discover -s tests -v
-```
-
-For runtime checks, install the integration in a separate Home Assistant test
-instance. CI tests minimum/latest HA, hassfest and the legacy-named HACS validator.
-Offline tests do not replace hardware checks.
-
-Releases use Conventional Commits (`fix:`, `feat:`, `feat!:` with breaking-change
-details). Every push to `main` maintains a release-please PR with version/CHANGELOG
-updates. `version.txt`, the release manifest and integration version stay aligned.
-Use `ci:` or `chore:` for automation-only changes, not `feat:`.
-
-Use Conventional Commits for **PR titles** too, for example
-`fix: handle expired sessions`, `feat: add a heater sensor`, or
-`docs: clarify installation`. Normally use **Squash and merge**, keeping the PR
-title as the squash commit subject. Preserve breaking-change details
-(`BREAKING CHANGE:`) and any intentional `Release-As:` footer in the final commit
-body; use a merge commit when a PR explicitly requires retaining its commits.
-
-Merging the release PR creates a draft Release, and a
-separate job tests its immutable commit, verifies versions and attaches the single
-Marketplace ZIP (with LICENSE/NOTICE). GitHub supplies source archives automatically.
-If packaging fails, use **Re-run failed jobs** on that run. Never publish a failed
-or asset-less draft. Review assets/notes and **publish manually**. No tag-triggered
-duplicate release workflow is used.
-
-Release clearance still requires resolving ECAMpy-derived code permissions
-([NOTICE](NOTICE)), and establishing provenance/permitted use of the fixed
-API/client/app values. Existing public code is not proof of permission.
-Complete remaining hardware checks and a clean Marketplace ZIP installation
-before publication. CI success does not resolve these prerequisites.
+For help, open an
+[issue](https://github.com/sayurin/delonghi-comfort-integration/issues) with
+the Home Assistant and integration versions, device model, a description of the
+problem, and sanitized logs. Do not share passwords, tokens, email addresses,
+DSNs, or serial numbers. Home Assistant's Config Entry storage is not guaranteed
+to be encrypted; protect your configuration, backups, and logs.
 
 ## License
 
-[Apache-2.0](LICENSE), subject to unresolved third-party provenance in
-[NOTICE](NOTICE); no license is inferred for others' code. Derived from philm5,
-rtfpessoa/delonghi-comfort-client and authentication work attributed to ECAMpy.
-Code and the original generic radiator artwork used AI assistance. Unofficial,
-without manufacturer endorsement or warranty; never replace appliance safety controls.
+See [LICENSE](LICENSE) and [NOTICE](NOTICE) for license and third-party
+attribution information.

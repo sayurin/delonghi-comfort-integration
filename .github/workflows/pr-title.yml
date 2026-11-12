@@ -1,0 +1,24 @@
+name: PR title
+
+on:
+  pull_request_target:
+    branches: [main, master]
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Validate pull request title
+        run: python scripts/check_pr_title.py
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
