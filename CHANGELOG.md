@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/sayurin/delonghi-comfort-integration/compare/v0.2.0...v0.2.1) (2026-11-12)
+
+
+### Bug Fixes
+
+* **polling:** use a 60-second default ([#10](https://github.com/sayurin/delonghi-comfort-integration/issues/10)) ([8b4c768](https://github.com/sayurin/delonghi-comfort-integration/commit/8b4c768f8e7a5104394de799315d80fb4532533e))
+
 ## [0.2.0](https://github.com/sayurin/delonghi-comfort-integration/compare/v0.1.1...v0.2.0) (2026-11-11)
 
 
