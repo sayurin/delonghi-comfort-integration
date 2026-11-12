@@ -90,6 +90,6 @@ CONF_SCAN_INTERVAL = "scan_interval"
 DEFAULT_LANGUAGE = "en"
 
 # Update intervals
-SCAN_INTERVAL = 5  # seconds
+SCAN_INTERVAL = 60  # seconds
 
 SUPPORTED_MODELS = frozenset({"DL-heater"})

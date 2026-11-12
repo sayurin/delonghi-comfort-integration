@@ -108,7 +108,7 @@ class OptionsFlowTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_default_and_allowed_scan_intervals(self):
         result = await self.flow.async_step_init()
-        self.assertEqual(result["data_schema"]({})["scan_interval"], 5)
+        self.assertEqual(result["data_schema"]({})["scan_interval"], 60)
         for value in (5, 15, 300):
             result = await self.flow.async_step_init({"scan_interval": value})
             self.assertEqual(result["data"], {"scan_interval": value})
