@@ -17,7 +17,9 @@ from custom_components.delonghi_comfort.api import (
 def response_context(data=None, *, text=None, headers=None, status=200):
     """Build an aiohttp-style response context without network access."""
     response = MagicMock()
-    response.text = AsyncMock(return_value=text if text is not None else json.dumps(data))
+    response.text = AsyncMock(
+        return_value=text if text is not None else json.dumps(data)
+    )
     response.headers = headers or {}
     response.status = status
     context = MagicMock()
@@ -32,10 +34,14 @@ class ConsentSignatureTests(unittest.IsolatedAsyncioTestCase):
     def make_api(self, page):
         session = MagicMock()
         session.get.side_effect = [
-            response_context(headers={"Location": "https://example.invalid/?context=test"}),
+            response_context(
+                headers={"Location": "https://example.invalid/?context=test"}
+            ),
             response_context({"ucid": "test", "gmid": "test", "gmidTicket": "test"}),
             response_context(text=page),
-            response_context(headers={"Location": "https://example.invalid/?code=test"}),
+            response_context(
+                headers={"Location": "https://example.invalid/?code=test"}
+            ),
         ]
         session.post.side_effect = [
             response_context(
@@ -79,7 +85,11 @@ class ConsentSignatureTests(unittest.IsolatedAsyncioTestCase):
         api = self.make_api("unused")
         api.session.post.side_effect = [
             response_context(
-                {"statusCode": 403, "errorCode": 403043, "errorDetails": "private-value"}
+                {
+                    "statusCode": 403,
+                    "errorCode": 403043,
+                    "errorDetails": "private-value",
+                }
             )
         ]
         with self.assertRaises(DeLonghiAuthenticationError) as error:
@@ -175,7 +185,9 @@ class APIRequestTests(unittest.IsolatedAsyncioTestCase):
             response_context(status=401),
             response_context(status=401),
         ]
-        self.session.post.return_value = response_context({"access_token": "new-access"})
+        self.session.post.return_value = response_context(
+            {"access_token": "new-access"}
+        )
         with self.assertRaises(DeLonghiAuthenticationError):
             await self.api.get_devices()
         self.assertEqual(self.session.request.call_count, 2)

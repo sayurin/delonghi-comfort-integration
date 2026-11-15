@@ -3,7 +3,6 @@
 from typing import Any
 
 import probatio
-
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.core import callback
@@ -51,7 +50,9 @@ class DelonghiComfortConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return "unexpected_response"
         if not devices:
             return "no_devices"
-        if not any(device["device"].get("oem_model") in SUPPORTED_MODELS for device in devices):
+        if not any(
+            device["device"].get("oem_model") in SUPPORTED_MODELS for device in devices
+        ):
             return "unsupported_devices"
         return None
 
@@ -76,9 +77,9 @@ class DelonghiComfortConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     probatio.Required(CONF_USERNAME): str,
                     probatio.Required(probatio.Secret(CONF_PASSWORD)): str,
-                    probatio.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): probatio.In(
-                        list(LANGUAGES)
-                    ),
+                    probatio.Optional(
+                        CONF_LANGUAGE, default=DEFAULT_LANGUAGE
+                    ): probatio.In(list(LANGUAGES)),
                 }
             ),
             errors=errors,
@@ -126,7 +127,9 @@ class DelonghiComfortOptionsFlow(config_entries.OptionsFlow):
             {
                 probatio.Optional(
                     CONF_SCAN_INTERVAL,
-                    default=self.config_entry.options.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL),
+                    default=self.config_entry.options.get(
+                        CONF_SCAN_INTERVAL, SCAN_INTERVAL
+                    ),
                 ): probatio.All(probatio.Coerce(int), probatio.Range(min=5, max=300)),
             }
         )

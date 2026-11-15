@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import numeric_value
+from .coordinator import DeLonghiCoordinator, numeric_value
 
 HEATER_DESCRIPTIONS = (
     SwitchEntityDescription(
@@ -45,7 +45,7 @@ async def async_setup_entry(
     )
 
 
-class HeaterSwitch(CoordinatorEntity, SwitchEntity):
+class HeaterSwitch(CoordinatorEntity[DeLonghiCoordinator], SwitchEntity):
     """Representation of a De'Longhi heater switch entity."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH
@@ -53,7 +53,7 @@ class HeaterSwitch(CoordinatorEntity, SwitchEntity):
 
     def __init__(
         self,
-        coordinator,
+        coordinator: DeLonghiCoordinator,
         description: SwitchEntityDescription,
     ) -> None:
         """Initialize the switch entity."""
@@ -72,8 +72,12 @@ class HeaterSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-        await self.coordinator.async_set_property(f"set_{self.entity_description.key}", 1)
+        await self.coordinator.async_set_property(
+            f"set_{self.entity_description.key}", 1
+        )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        await self.coordinator.async_set_property(f"set_{self.entity_description.key}", 0)
+        await self.coordinator.async_set_property(
+            f"set_{self.entity_description.key}", 0
+        )

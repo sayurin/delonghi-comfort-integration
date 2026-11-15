@@ -15,6 +15,8 @@ class PullRequestTitleTests(unittest.TestCase):
             "feat!: remove legacy authentication",
             "fix(auth)!: reject expired tokens",
             "docs: clarify Marketplace installation",
+            "release: publish a draft",
+            "custom-type(scope with spaces): allow the project-specific type",
         ):
             with self.subTest(title=title):
                 self.assertTrue(is_valid_title(title))
@@ -23,7 +25,6 @@ class PullRequestTitleTests(unittest.TestCase):
         for title in (
             "Handle expired sessions",
             "Fix: handle expired sessions",
-            "feature: add a feature",
             "fix:",
             "feat(): add reauthentication",
             "feat: add reauthentication\nBREAKING CHANGE: details",

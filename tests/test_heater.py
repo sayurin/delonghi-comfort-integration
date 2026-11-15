@@ -1,8 +1,8 @@
 """Synthetic and sanitized hardware-derived heater telemetry tests."""
 
 import json
-from pathlib import Path
 import unittest
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.climate import HVACAction, HVACMode
@@ -53,8 +53,12 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_fixture_values_and_existing_unique_ids(self):
         self.assertEqual(self.climate.unique_id, "delonghi_heater_test-dsn")
-        self.assertEqual(self.brightness.unique_id, "delonghi_heater_test-dsn_brightness")
-        self.assertEqual(self.temperature.unique_id, "delonghi_heater_test-dsn_temperature")
+        self.assertEqual(
+            self.brightness.unique_id, "delonghi_heater_test-dsn_brightness"
+        )
+        self.assertEqual(
+            self.temperature.unique_id, "delonghi_heater_test-dsn_temperature"
+        )
         self.assertEqual(
             [entity.unique_id for entity in self.switches],
             ["delonghi_heater_test-dsn_eco", "delonghi_heater_test-dsn_lock"],
@@ -73,10 +77,24 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_hardware_derived_model_fixtures(self):
         for filename, model, temperature, target, preset, power, action in (
-            ("mdh_wifi_properties.json", "MDH Wifi", 21, 20.0,
-             "night_mode", "20", HVACAction.IDLE),
-            ("mdh15_wifi_properties.json", "MDH15 Wifi", 23, 24.0,
-             "day_mode", "100", HVACAction.HEATING),
+            (
+                "mdh_wifi_properties.json",
+                "MDH Wifi",
+                21,
+                20.0,
+                "night_mode",
+                "20",
+                HVACAction.IDLE,
+            ),
+            (
+                "mdh15_wifi_properties.json",
+                "MDH15 Wifi",
+                23,
+                24.0,
+                "day_mode",
+                "100",
+                HVACAction.HEATING,
+            ),
         ):
             with self.subTest(model=model):
                 properties = json.loads(
@@ -103,8 +121,9 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.brightness.current_option, "Level 1")
                 info = DeLonghiCoordinator.get_device_info(self.coordinator)
                 self.assertEqual(info["model"], model)
-                self.assertEqual(info["hw_version"],
-                                 self.coordinator.data["hardware_version"])
+                self.assertEqual(
+                    info["hw_version"], self.coordinator.data["hardware_version"]
+                )
 
     async def test_half_degree_setpoints_cover_full_supported_range(self):
         for half_degrees in range(20, 57):
@@ -137,7 +156,9 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(
                     all(entity.coordinator is self.coordinator for entity in entities)
                 )
-                hass.data["delonghi_comfort"][entry.entry_id]["heater_coordinators"] = []
+                hass.data["delonghi_comfort"][entry.entry_id][
+                    "heater_coordinators"
+                ] = []
                 empty_entities = []
                 await platform.async_setup_entry(hass, entry, empty_entities.extend)
                 self.assertEqual(empty_entities, [])
@@ -146,7 +167,9 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
                 ]
 
     async def test_heater_uses_class_defaults_and_json_icon(self):
-        root = Path(__file__).resolve().parents[1] / "custom_components/delonghi_comfort"
+        root = (
+            Path(__file__).resolve().parents[1] / "custom_components/delonghi_comfort"
+        )
         icons = json.loads((root / "icons.json").read_text())
         self.assertIsNone(self.climate.icon)
         self.assertEqual(
@@ -154,10 +177,17 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
             "mdi:radiator",
         )
         for attribute in (
-            "_attr_supported_features", "_attr_has_entity_name", "_attr_name",
-            "_attr_translation_key", "_attr_fan_modes", "_attr_hvac_modes",
-            "_attr_max_temp", "_attr_min_temp", "_attr_preset_modes",
-            "_attr_target_temperature_step", "_attr_native_temperature_unit",
+            "_attr_supported_features",
+            "_attr_has_entity_name",
+            "_attr_name",
+            "_attr_translation_key",
+            "_attr_fan_modes",
+            "_attr_hvac_modes",
+            "_attr_max_temp",
+            "_attr_min_temp",
+            "_attr_preset_modes",
+            "_attr_target_temperature_step",
+            "_attr_native_temperature_unit",
         ):
             self.assertIn(attribute, DeLonghiHeater.__dict__)
             self.assertNotIn(attribute, vars(self.climate))
@@ -167,7 +197,11 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(value=value):
                 self.coordinator.data = {
                     key: value
-                    for key in ("device_mode", "current_power_level", "current_brightness")
+                    for key in (
+                        "device_mode",
+                        "current_power_level",
+                        "current_brightness",
+                    )
                 }
                 self.assertIsNone(self.climate.preset_mode)
                 self.assertIsNone(self.climate.fan_mode)
@@ -209,10 +243,28 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
             (self.climate.async_turn_on, (), {}, "set_status", 1),
             (self.climate.async_turn_off, (), {}, "set_status", 2),
             (self.climate.async_set_hvac_mode, (HVACMode.HEAT,), {}, "set_status", 1),
-            (self.climate.async_set_preset_mode, ("antifrost",), {}, "set_device_mode", 3),
+            (
+                self.climate.async_set_preset_mode,
+                ("antifrost",),
+                {},
+                "set_device_mode",
+                3,
+            ),
             (self.climate.async_set_fan_mode, ("60",), {}, "set_power_level", 3),
-            (self.climate.async_set_temperature, (), {"temperature": 21.5}, "temperature_setpoint", 21.5),
-            (self.brightness.async_select_option, ("Level 3",), {}, "set_brightness", 3),
+            (
+                self.climate.async_set_temperature,
+                (),
+                {"temperature": 21.5},
+                "temperature_setpoint",
+                21.5,
+            ),
+            (
+                self.brightness.async_select_option,
+                ("Level 3",),
+                {},
+                "set_brightness",
+                3,
+            ),
             (self.switches[0].async_turn_on, (), {}, "set_eco", 1),
             (self.switches[1].async_turn_off, (), {}, "set_lock", 0),
         )
@@ -222,38 +274,61 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
                 self.coordinator.api.set_device_property.assert_awaited_with(
                     "test-dsn", name, value
                 )
-        self.assertEqual(self.coordinator.async_request_refresh.await_count, len(commands))
+        self.assertEqual(
+            self.coordinator.async_request_refresh.await_count, len(commands)
+        )
 
     async def test_all_mode_values_icons_labels_and_device_commands(self):
-        root = Path(__file__).resolve().parents[1] / "custom_components/delonghi_comfort"
+        root = (
+            Path(__file__).resolve().parents[1] / "custom_components/delonghi_comfort"
+        )
         icons = json.loads((root / "icons.json").read_text())
         translations = json.loads((root / "translations/en.json").read_text())
         icon_attributes = icons["entity"]["climate"]["heater"]["state_attributes"]
         labels = translations["entity"]["climate"]["heater"]["state_attributes"]
         cases = (
-            ("preset_mode", "preset_modes", "device_mode", "set_device_mode", 1,
-             self.climate.async_set_preset_mode, (
-                 ("day_mode", "Day mode", "mdi:weather-sunny"),
-                 ("night_mode", "Night mode", "mdi:weather-night"),
-                 ("antifrost", "Antifrost", "mdi:snowflake-thermometer"),
-                 ("manual", "Manual", "mdi:hand-front-left"),
-             )),
-            ("fan_mode", "fan_modes", "current_power_level", "set_power_level", 0,
-             self.climate.async_set_fan_mode, (
-                 ("0", "0%", "mdi:lightbulb-off"),
-                 ("20", "20%", "mdi:lightbulb-on-20"),
-                 ("40", "40%", "mdi:lightbulb-on-40"),
-                 ("60", "60%", "mdi:lightbulb-on-60"),
-                 ("80", "80%", "mdi:lightbulb-on-80"),
-                 ("100", "100%", "mdi:lightbulb-on"),
-             )),
+            (
+                "preset_mode",
+                "preset_modes",
+                "device_mode",
+                "set_device_mode",
+                1,
+                self.climate.async_set_preset_mode,
+                (
+                    ("day_mode", "Day mode", "mdi:weather-sunny"),
+                    ("night_mode", "Night mode", "mdi:weather-night"),
+                    ("antifrost", "Antifrost", "mdi:snowflake-thermometer"),
+                    ("manual", "Manual", "mdi:hand-front-left"),
+                ),
+            ),
+            (
+                "fan_mode",
+                "fan_modes",
+                "current_power_level",
+                "set_power_level",
+                0,
+                self.climate.async_set_fan_mode,
+                (
+                    ("0", "0%", "mdi:lightbulb-off"),
+                    ("20", "20%", "mdi:lightbulb-on-20"),
+                    ("40", "40%", "mdi:lightbulb-on-40"),
+                    ("60", "60%", "mdi:lightbulb-on-60"),
+                    ("80", "80%", "mdi:lightbulb-on-80"),
+                    ("100", "100%", "mdi:lightbulb-on"),
+                ),
+            ),
         )
         for attribute, modes, telemetry, command, offset, setter, entries in cases:
-            self.assertEqual(getattr(self.climate, modes), [key for key, _, _ in entries])
-            self.assertEqual(icon_attributes[attribute]["state"],
-                             {key: icon for key, _, icon in entries})
-            self.assertEqual(labels[attribute]["state"],
-                             {key: label for key, label, _ in entries})
+            self.assertEqual(
+                getattr(self.climate, modes), [key for key, _, _ in entries]
+            )
+            self.assertEqual(
+                icon_attributes[attribute]["state"],
+                {key: icon for key, _, icon in entries},
+            )
+            self.assertEqual(
+                labels[attribute]["state"], {key: label for key, label, _ in entries}
+            )
             for index, (key, _, _) in enumerate(entries, start=offset):
                 with self.subTest(attribute=attribute, key=key):
                     self.coordinator.data[telemetry] = index
@@ -271,8 +346,10 @@ class HeaterTests(unittest.IsolatedAsyncioTestCase):
             (self.climate.async_set_preset_mode, ("Day mode",), {}),
             (self.climate.async_set_fan_mode, ("20%",), {}),
             (self.brightness.async_select_option, ("unknown",), {}),
-            *((self.climate.async_set_temperature, (), {"temperature": value})
-              for value in (None, 9.5, 28.5, 20.25, float("nan"), True)),
+            *(
+                (self.climate.async_set_temperature, (), {"temperature": value})
+                for value in (None, 9.5, 28.5, 20.25, float("nan"), True)
+            ),
         )
         for command, args, kwargs in commands:
             with self.assertRaises(ServiceValidationError):

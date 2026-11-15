@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,11 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
-BUILD = next(
-    step["run"]
-    for step in WORKFLOW["jobs"]["package"]["steps"]
-    if step.get("name") == "Build integration ZIP"
-)
+BUILD_SCRIPT = ROOT / "scripts/build_release.py"
 
 
 class ReleaseTests(unittest.TestCase):
@@ -64,9 +61,13 @@ class ReleaseTests(unittest.TestCase):
 
     def build(self, tag="v1.2.3", sha=None):
         return subprocess.run(
-            ["bash", "-c", BUILD],
+            [sys.executable, str(BUILD_SCRIPT)],
             cwd=self.repository,
-            env={**os.environ, "RELEASE_TAG": tag, "RELEASE_SHA": sha or self.sha},
+            env={
+                **os.environ,
+                "RELEASE_TAG": tag,
+                "RELEASE_SHA": sha or self.sha,
+            },
             capture_output=True,
             text=True,
             check=False,
@@ -140,12 +141,18 @@ class ReleaseTests(unittest.TestCase):
     def test_tracked_bytecode_and_symlinks_are_rejected(self):
         integration = self.repository / "custom_components/delonghi_comfort"
         (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
-        for path in (integration / "stale.pyc", integration / "linked.py"):
+        for path in (
+            integration / "stale.pyc",
+            integration / "linked.py",
+            integration / "..\\escape.py",
+        ):
             with self.subTest(path=path.name):
                 if path.suffix == ".pyc":
                     path.write_bytes(b"tracked bytecode")
-                else:
+                elif path.name == "linked.py":
                     path.symlink_to("__init__.py")
+                else:
+                    path.write_text("outside")
                 self.git(
                     "add",
                     "custom_components/delonghi_comfort/manifest.json",
@@ -156,6 +163,7 @@ class ReleaseTests(unittest.TestCase):
                 result = self.build(sha=sha)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("Unexpected integration archive member", result.stderr)
+                self.assertFalse(self.archive.exists())
                 path.unlink()
                 self.git("add", str(path.relative_to(self.repository)))
                 self.commit()
@@ -236,3 +244,26 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("--json isDraft", upload["run"])
         self.assertIn("gh release upload", upload["run"])
         self.assertNotIn("gh release create", upload["run"])
+        self.assertIn(
+            "python scripts/build_release.py", jobs["package"]["steps"][-2]["run"]
+        )
+
+    def test_manual_recovery_only_replaces_an_existing_draft_zip(self):
+        events = WORKFLOW[True]
+        self.assertIn("release_tag", events["workflow_dispatch"]["inputs"])
+        recovery = WORKFLOW["jobs"]["recover"]
+        self.assertEqual(
+            recovery["if"],
+            "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.release_tag != ''",
+        )
+        self.assertEqual(recovery["permissions"], {"contents": "write"})
+        steps = recovery["steps"]
+        draft_check = next(
+            step["run"]
+            for step in steps
+            if step.get("name") == "Validate release tag and draft status"
+        )
+        self.assertIn("isDraft", draft_check)
+        self.assertEqual(steps[0]["with"]["ref"], "${{ github.sha }}")
+        self.assertIn("--clobber", steps[-1]["run"])
+        self.assertIn("gh release view", steps[-1]["run"])

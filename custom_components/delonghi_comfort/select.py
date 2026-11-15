@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import indexed_value
+from .coordinator import DeLonghiCoordinator, indexed_value
 
 
 async def async_setup_entry(
@@ -26,15 +26,15 @@ async def async_setup_entry(
     )
 
 
-class HeaterBrightness(CoordinatorEntity, SelectEntity):
+class HeaterBrightness(CoordinatorEntity[DeLonghiCoordinator], SelectEntity):
     """Representation of a heater brightness entity."""
 
     _attr_has_entity_name = True
     _attr_icon = "mdi:brightness-6"
     _attr_translation_key = "brightness"
-    _attr_options = ["Level 1", "Level 2", "Level 3"]
+    _attr_options = ["Level 1", "Level 2", "Level 3"]  # noqa: RUF012
 
-    def __init__(self, coordinator) -> None:
+    def __init__(self, coordinator: DeLonghiCoordinator) -> None:
         """Initialize the select entity."""
         super().__init__(coordinator)
         self._attr_unique_id = f"delonghi_heater_{coordinator.dsn}_brightness"

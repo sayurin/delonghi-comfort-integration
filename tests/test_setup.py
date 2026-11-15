@@ -29,7 +29,10 @@ class SetupTests(unittest.IsolatedAsyncioTestCase):
         self.hass.config_entries.async_forward_entry_setups = AsyncMock()
         self.entry = MagicMock()
         self.entry.entry_id = "test-entry"
-        self.entry.data = {"username": "test@example.invalid", "password": "test-password"}
+        self.entry.data = {
+            "username": "test@example.invalid",
+            "password": "test-password",
+        }
         self.api = MagicMock()
         self.api.authenticate = AsyncMock(return_value=True)
         self.api.get_devices = AsyncMock()
@@ -47,7 +50,8 @@ class SetupTests(unittest.IsolatedAsyncioTestCase):
     async def test_mixed_account_initializes_only_heater(self):
         heater = {"device": {"dsn": "test-heater", "oem_model": "DL-heater"}}
         self.api.get_devices.return_value = [
-            heater, {"device": {"dsn": "test-unknown", "oem_model": "unknown"}}
+            heater,
+            {"device": {"dsn": "test-unknown", "oem_model": "unknown"}},
         ]
         with self.assertLogs(MODULE, level="WARNING") as logs:
             self.assertTrue(await async_setup_entry(self.hass, self.entry))

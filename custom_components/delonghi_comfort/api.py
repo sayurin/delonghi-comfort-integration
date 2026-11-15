@@ -77,9 +77,13 @@ class DeLonghiAPI:
     def _check_status(response: aiohttp.ClientResponse) -> None:
         """Classify HTTP failures without exposing a URL or response body."""
         if response.status in (401, 403):
-            raise DeLonghiAuthenticationError("De'Longhi authentication expired or denied")
+            raise DeLonghiAuthenticationError(
+                "De'Longhi authentication expired or denied"
+            )
         if response.status == 429 or response.status >= 500:
-            raise DeLonghiConnectionError("De'Longhi service is temporarily unavailable")
+            raise DeLonghiConnectionError(
+                "De'Longhi service is temporarily unavailable"
+            )
         if response.status >= 400:
             raise DeLonghiProtocolError("De'Longhi rejected the API request")
 
@@ -88,17 +92,21 @@ class DeLonghiAPI:
         self._check_status(response)
         try:
             return json.loads(await response.text())
-        except (ValueError, UnicodeError):
+        except ValueError, UnicodeError:
             raise DeLonghiProtocolError("De'Longhi returned invalid JSON") from None
 
     @staticmethod
     def _require_string(data: dict[str, Any], key: str) -> str:
         """Reject absent and empty tokens rather than sending them to another endpoint."""
         if not isinstance(data, dict):
-            raise DeLonghiProtocolError("De'Longhi returned an incomplete authentication response")
+            raise DeLonghiProtocolError(
+                "De'Longhi returned an incomplete authentication response"
+            )
         value = data[key]
         if not isinstance(value, str) or not value:
-            raise DeLonghiProtocolError("De'Longhi returned an incomplete authentication response")
+            raise DeLonghiProtocolError(
+                "De'Longhi returned an incomplete authentication response"
+            )
         return value
 
     def get_query_param(self, url: str, param: str) -> str | None:
@@ -112,11 +120,11 @@ class DeLonghiAPI:
         async with self._auth_lock:
             self.access_token = await self._get_new_access_token()
         return True
+
     async def _get_new_access_token(self) -> str:
         """Get a new access token through the full authentication flow."""
 
-        
-        # Thanks to https://github.com/duckwc/ECAMpy for the code to token convertion
+        # Thanks to https://github.com/duckwc/ECAMpy for the code to token conversion
         # Thanks to https://github.com/rtfpessoa/delonghi-comfort-client, for the cli code to implement the authentication flow
         try:
             # Step 1: Start authentication process
@@ -136,7 +144,9 @@ class DeLonghiAPI:
                 self._check_status(response)
                 context = self.get_query_param(response.headers["Location"], "context")
                 if not context:
-                    raise DeLonghiProtocolError("De'Longhi did not provide an authentication context")
+                    raise DeLonghiProtocolError(
+                        "De'Longhi did not provide an authentication context"
+                    )
 
             # Step 2: Fetch Gigya session data
             async with self.session.get(
@@ -231,10 +241,14 @@ class DeLonghiAPI:
                 login_data = await self._read_json(response)
 
             if not isinstance(login_data, dict):
-                raise DeLonghiProtocolError("De'Longhi returned an invalid login response")
+                raise DeLonghiProtocolError(
+                    "De'Longhi returned an invalid login response"
+                )
             if login_data.get("statusCode") != 200:
                 if login_data.get("errorCode") in (403042, 403043):
-                    raise DeLonghiAuthenticationError("De'Longhi rejected the account credentials")
+                    raise DeLonghiAuthenticationError(
+                        "De'Longhi rejected the account credentials"
+                    )
                 raise DeLonghiProtocolError("De'Longhi login could not be completed")
 
             login_token = self._require_string(login_data["sessionInfo"], "login_token")
@@ -281,8 +295,12 @@ class DeLonghiAPI:
                 self._check_status(response)
                 consent_text = await response.text()
 
-            if not (match := _CONSENT_SIG_RE.search(consent_text)) or not match.group(2):
-                raise DeLonghiProtocolError("Consent signature not found in consent page")
+            if not (match := _CONSENT_SIG_RE.search(consent_text)) or not match.group(
+                2
+            ):
+                raise DeLonghiProtocolError(
+                    "Consent signature not found in consent page"
+                )
             signature = match.group(2)
 
             # Step 6: Authorization
@@ -311,7 +329,9 @@ class DeLonghiAPI:
                 self._check_status(response)
                 code = self.get_query_param(response.headers["Location"], "code")
                 if not code:
-                    raise DeLonghiProtocolError("De'Longhi did not provide an authorization code")
+                    raise DeLonghiProtocolError(
+                        "De'Longhi did not provide an authorization code"
+                    )
 
             # Step 7: Get IDP access token
             async with self.session.post(
@@ -349,10 +369,14 @@ class DeLonghiAPI:
             self.refresh_token = self._require_string(ayla_data, "refresh_token")
             return access_token
 
-        except (aiohttp.ClientError, TimeoutError):
-            raise DeLonghiConnectionError("Unable to connect to De'Longhi authentication service") from None
-        except (KeyError, TypeError, ValueError):
-            raise DeLonghiProtocolError("De'Longhi returned an incomplete authentication response") from None
+        except aiohttp.ClientError, TimeoutError:
+            raise DeLonghiConnectionError(
+                "Unable to connect to De'Longhi authentication service"
+            ) from None
+        except KeyError, TypeError, ValueError:
+            raise DeLonghiProtocolError(
+                "De'Longhi returned an incomplete authentication response"
+            ) from None
 
     async def refresh_access_token(self) -> str:
         """Refresh the access token using the refresh token."""
@@ -376,10 +400,14 @@ class DeLonghiAPI:
                 if "refresh_token" in data:
                     self.refresh_token = self._require_string(data, "refresh_token")
                 return new_access_token
-        except (aiohttp.ClientError, TimeoutError):
-            raise DeLonghiConnectionError("Unable to refresh De'Longhi session") from None
-        except (KeyError, TypeError, ValueError):
-            raise DeLonghiProtocolError("De'Longhi returned an incomplete token response") from None
+        except aiohttp.ClientError, TimeoutError:
+            raise DeLonghiConnectionError(
+                "Unable to refresh De'Longhi session"
+            ) from None
+        except KeyError, TypeError, ValueError:
+            raise DeLonghiProtocolError(
+                "De'Longhi returned an incomplete token response"
+            ) from None
 
     async def get_devices(self) -> list[dict[str, Any]]:
         """Get all devices associated with the account."""
@@ -433,21 +461,23 @@ class DeLonghiAPI:
                     if response.status != 401 or attempt:
                         result = await self._read_json(response)
                         if method == "POST" and not isinstance(result, dict):
-                            raise DeLonghiProtocolError("De'Longhi returned an invalid command response")
+                            raise DeLonghiProtocolError(
+                                "De'Longhi returned an invalid command response"
+                            )
                         return result
                 async with self._auth_lock:
                     if self.access_token == token:
                         self.access_token = await self.refresh_access_token()
-        except (aiohttp.ClientError, TimeoutError):
-            raise DeLonghiConnectionError("Unable to communicate with De'Longhi service") from None
+        except aiohttp.ClientError, TimeoutError:
+            raise DeLonghiConnectionError(
+                "Unable to communicate with De'Longhi service"
+            ) from None
 
     async def _get_request(self, path: str) -> Any:
         """Make a GET request to the API."""
         return await self._request("GET", path)
 
-    async def _post_request(
-        self, path: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _post_request(self, path: str, data: dict[str, Any]) -> dict[str, Any]:
         """Make a POST request to the API."""
         return await self._request("POST", path, data)
 

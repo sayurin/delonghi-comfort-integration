@@ -16,7 +16,7 @@ This product includes software developed by third parties:
 2. duckwc/ECAMpy
    Copyright (c) duckwc
    Available at: https://github.com/duckwc/ECAMpy
-   
+
    Portions of the authentication and token conversion code are derived from this project.
    Permission/license for those portions has not been verified. No LICENSE file
    was present in that public repository when checked on 2026-11-10. This notice
