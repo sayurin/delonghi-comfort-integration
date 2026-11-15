@@ -1,6 +1,7 @@
 """The De'Longhi Comfort integration."""
 
 import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -9,19 +10,18 @@ from homeassistant.exceptions import (
     ConfigEntryError,
     ConfigEntryNotReady,
 )
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
 from .const import (
-    DOMAIN,
-    CONF_USERNAME,
-    CONF_PASSWORD,
     CONF_LANGUAGE,
-    CONF_SCAN_INTERVAL,
+    CONF_PASSWORD,
+    CONF_USERNAME,
     DEFAULT_LANGUAGE,
+    DOMAIN,
     SUPPORTED_MODELS,
 )
-from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
 from .coordinator import DeLonghiCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -56,7 +56,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady("No De'Longhi devices found on the account")
 
     supported_devices = [
-        device for device in devices
+        device
+        for device in devices
         if device["device"].get("oem_model") in SUPPORTED_MODELS
     ]
     unsupported_count = len(devices) - len(supported_devices)
@@ -66,7 +67,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             unsupported_count,
         )
     if not supported_devices:
-        raise ConfigEntryError("No supported De'Longhi devices found; only DL-heater is supported")
+        raise ConfigEntryError(
+            "No supported De'Longhi devices found; only DL-heater is supported"
+        )
 
     # Create coordinators for each device
     heater_coordinators = []

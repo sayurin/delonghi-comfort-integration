@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft release tag to rebuild, for example v0.2.1
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -14,6 +19,7 @@ concurrency:
 
 jobs:
   release:
+    if: github.event_name != 'workflow_dispatch' || inputs.release_tag == ''
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
@@ -29,7 +35,7 @@ jobs:
             echo "::error::Configure APP_ID and APP_PRIVATE_KEY for the repository's release GitHub App."
             exit 1
           fi
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v2.2.2
         id: app
         with:
           app-id: ${{ vars.APP_ID }}
@@ -37,7 +43,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v4.4.1
         id: release
         with:
           token: ${{ steps.app.outputs.token }}
@@ -50,18 +56,21 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           ref: ${{ needs.release.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
-          python-version: "3.14"
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: 0.13.1
+      - name: Install minimum-version test environment
+        run: uv sync --locked --extra dev --extra ha-minimum
       - name: Run offline regression tests
-        run: python -m unittest discover -s tests -v
+        run: uv run --locked --extra dev --extra ha-minimum pytest
       - uses: home-assistant/actions/hassfest@master
       - name: Build integration ZIP
         env:
@@ -69,55 +78,7 @@ jobs:
           RELEASE_SHA: ${{ needs.release.outputs.sha }}
         run: |
           set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          import re
-          import subprocess
-          from pathlib import Path
-          from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
-
-          tag = os.environ["RELEASE_TAG"]
-          revision = os.environ["RELEASE_SHA"]
-          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
-              raise ValueError("Release tag must be vMAJOR.MINOR.PATCH")
-          if not re.fullmatch(r"[0-9a-f]{40}", revision):
-              raise ValueError("Release revision must be a full commit SHA")
-          manifest_path = "custom_components/delonghi_comfort"
-          def committed(path):
-              return subprocess.check_output(["git", "show", f"{revision}:{path}"])
-          manifest = json.loads(committed(f"{manifest_path}/manifest.json"))
-          if manifest["version"] != tag.removeprefix("v"):
-              raise ValueError("Release tag does not match the committed manifest version")
-          if committed("version.txt").decode().strip() != manifest["version"]:
-              raise ValueError("Release version files disagree")
-          documents = {name: committed(name) for name in ("LICENSE", "NOTICE")}
-          output = Path("dist/delonghi_comfort.zip")
-          output.parent.mkdir(exist_ok=True)
-          subprocess.run(
-              ["git", "archive", "--format=zip", "--mtime=1980-01-01T00:00:00Z", f"--output={output}",
-               f"{revision}:{manifest_path}"], check=True,
-          )
-          with ZipFile(output, "a", compression=ZIP_DEFLATED) as archive:
-              for info in archive.infolist():
-                  path = Path(info.filename)
-                  if (
-                      path.is_absolute() or ".." in path.parts
-                      or "__pycache__" in path.parts
-                      or path.suffix in (".pyc", ".pyo")
-                      or (info.external_attr >> 16) & 0o170000 == 0o120000
-                  ):
-                      raise ValueError("Unexpected integration archive member")
-              for name, content in documents.items():
-                  if name in archive.namelist():
-                      raise ValueError("Duplicate license document in integration archive")
-                  info = ZipInfo(name)
-                  info.compress_type = ZIP_DEFLATED
-                  info.external_attr = 0o100644 << 16
-                  archive.writestr(info, content)
-              if not {"manifest.json", "__init__.py", "LICENSE", "NOTICE"} <= set(archive.namelist()):
-                  raise ValueError("Required integration archive members are missing")
-          PY
+          python scripts/build_release.py
       - name: Attach ZIP to draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -126,4 +87,57 @@ jobs:
         run: |
           set -euo pipefail
           [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" = true ]
+          gh release upload "$RELEASE_TAG" dist/delonghi_comfort.zip --clobber
+
+  recover:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: 0.13.1
+      - name: Install minimum-version test environment
+        run: uv sync --locked --extra dev --extra ha-minimum
+      - name: Offline regression tests
+        run: uv run --locked --extra dev --extra ha-minimum pytest
+      - uses: home-assistant/actions/hassfest@master
+      - name: Validate release tag and draft status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          release="$(gh release view "$RELEASE_TAG" --json isDraft,tagName)"
+          [ "$(jq -r .isDraft <<<"$release")" = true ]
+          [ "$(jq -r .tagName <<<"$release")" = "$RELEASE_TAG" ]
+      - name: Resolve release commit
+        id: revision
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: echo "sha=$(git rev-parse "$RELEASE_TAG^{commit}")" >> "$GITHUB_OUTPUT"
+      - name: Build integration ZIP
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_SHA: ${{ steps.revision.outputs.sha }}
+        run: python scripts/build_release.py
+      - name: Replace ZIP on draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          release="$(gh release view "$RELEASE_TAG" --json isDraft,tagName)"
+          [ "$(jq -r .isDraft <<<"$release")" = true ]
+          [ "$(jq -r .tagName <<<"$release")" = "$RELEASE_TAG" ]
           gh release upload "$RELEASE_TAG" dist/delonghi_comfort.zip --clobber

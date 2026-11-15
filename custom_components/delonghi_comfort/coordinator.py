@@ -1,8 +1,8 @@
 """Data update coordinator for De'Longhi Comfort integration."""
 
-from datetime import timedelta
 import logging
 import math
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -11,7 +11,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import DeLonghiAPI, DeLonghiAuthenticationError, DeLonghiError
-from .const import SCAN_INTERVAL, CONF_SCAN_INTERVAL, DOMAIN
+from .const import CONF_SCAN_INTERVAL, DOMAIN, SCAN_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def numeric_value(value: Any) -> float | None:
         return None
     try:
         number = float(value)
-    except (ValueError, OverflowError):
+    except ValueError, OverflowError:
         return None
     return number if math.isfinite(number) else None
 
@@ -72,7 +72,7 @@ class DeLonghiCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise UpdateFailed("De'Longhi returned no device properties")
 
             # Parse properties into a more usable format
-            data = {}
+            data: dict[str, Any] = {}
             for prop in properties:
                 if "property" in prop:
                     prop_info = prop["property"]

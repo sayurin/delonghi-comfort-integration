@@ -3,236 +3,286 @@
 import json
 import os
 import subprocess
-import tempfile
-import unittest
+import sys
 from pathlib import Path
 from zipfile import ZipFile
 
+import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
-BUILD = next(
-    step["run"]
-    for step in WORKFLOW["jobs"]["package"]["steps"]
-    if step.get("name") == "Build integration ZIP"
+BUILD_SCRIPT = ROOT / "scripts/build_release.py"
+
+
+def git(repository, *args):
+    return subprocess.check_output(
+        ["git", "-C", str(repository), *args], stderr=subprocess.STDOUT
+    )
+
+
+def commit(repository):
+    git(
+        repository,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "-m",
+        "Test release",
+    )
+
+
+@pytest.fixture
+def repository(tmp_path):
+    git(tmp_path, "init", "--initial-branch=main")
+    integration = tmp_path / "custom_components/delonghi_comfort"
+    integration.mkdir(parents=True)
+    (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
+    (integration / "__init__.py").write_text('"""Test integration."""\n')
+    (integration / "translations").mkdir()
+    (integration / "translations/ja.json").write_text("{}")
+    for name in ("LICENSE", "NOTICE"):
+        (tmp_path / name).write_text(name)
+    (tmp_path / "version.txt").write_text("1.2.3\n")
+    (tmp_path / "INTEGRATION-REBUILD-PLAN.md").write_text("Private plan")
+    git(tmp_path, "add", ".")
+    commit(tmp_path)
+
+    (integration / "manifest.json").write_text(json.dumps({"version": "9.9.9"}))
+    (integration / "local.py").write_text("untracked")
+    (integration / "__pycache__").mkdir()
+    (integration / "__pycache__/local.pyc").write_bytes(b"untracked")
+    return tmp_path
+
+
+@pytest.fixture
+def release_sha(repository):
+    return git(repository, "rev-parse", "HEAD").decode().strip()
+
+
+@pytest.fixture
+def archive(repository):
+    return repository / "dist/delonghi_comfort.zip"
+
+
+def build(repository, tag="v1.2.3", sha=None, release_sha=None):
+    return subprocess.run(
+        [sys.executable, str(BUILD_SCRIPT)],
+        cwd=repository,
+        env={
+            **os.environ,
+            "RELEASE_TAG": tag,
+            "RELEASE_SHA": sha or release_sha,
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_exact_layout_uses_committed_revision_and_is_reproducible(
+    repository,
+    release_sha,
+    archive,
+):
+    result = build(repository, release_sha=release_sha)
+    assert result.returncode == 0, result.stderr
+
+    with ZipFile(archive) as zip_file:
+        assert {name for name in zip_file.namelist() if not name.endswith("/")} == {
+            "manifest.json",
+            "__init__.py",
+            "translations/ja.json",
+            "LICENSE",
+            "NOTICE",
+        }
+        assert json.loads(zip_file.read("manifest.json"))["version"] == "1.2.3"
+        assert zip_file.read("LICENSE") == b"LICENSE"
+        destination = repository / "config/custom_components/delonghi_comfort"
+        zip_file.extractall(destination)
+        assert (destination / "manifest.json").is_file()
+        assert not (destination / "delonghi_comfort").exists()
+
+    first = archive.read_bytes()
+    assert build(repository, release_sha=release_sha).returncode == 0
+    assert archive.read_bytes() == first
+
+
+@pytest.mark.parametrize(
+    ("tag", "sha"),
+    (
+        ("v1.2.4", None),
+        ("1.2.3", None),
+        ("v1.2.3;exit", None),
+        ("v1.2.3", "main"),
+        ("v1.2.3", "f" * 40),
+    ),
 )
+def test_invalid_tag_revision_and_version_mismatch_fail(
+    repository,
+    release_sha,
+    archive,
+    tag,
+    sha,
+):
+    assert build(repository, tag, sha, release_sha).returncode != 0
+    assert not archive.exists()
 
 
-class ReleaseTests(unittest.TestCase):
-    """Keep the one Marketplace archive isolated from local files and metadata."""
+@pytest.mark.parametrize(
+    ("path", "content", "expected_error"),
+    (
+        ("version.txt", "8.0.0", "version files disagree"),
+        ("NOTICE", None, "NOTICE"),
+    ),
+)
+def test_version_file_and_required_notices_are_checked(
+    repository,
+    archive,
+    path,
+    content,
+    expected_error,
+):
+    target = repository / path
+    if content is None:
+        target.unlink()
+    else:
+        target.write_text(content)
+    git(repository, "add", path)
+    commit(repository)
+    sha = git(repository, "rev-parse", "HEAD").decode().strip()
 
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.repository = Path(temporary.name)
-        self.git("init", "--initial-branch=main")
-        integration = self.repository / "custom_components/delonghi_comfort"
-        integration.mkdir(parents=True)
-        (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
-        (integration / "__init__.py").write_text('"""Test integration."""\n')
-        (integration / "translations").mkdir()
-        (integration / "translations/ja.json").write_text("{}")
-        for name in ("LICENSE", "NOTICE"):
-            (self.repository / name).write_text(name)
-        (self.repository / "version.txt").write_text("1.2.3\n")
-        (self.repository / "INTEGRATION-REBUILD-PLAN.md").write_text("Private plan")
-        self.git("add", ".")
-        self.commit()
-        self.sha = self.git("rev-parse", "HEAD").decode().strip()
-        (integration / "manifest.json").write_text(json.dumps({"version": "9.9.9"}))
-        (integration / "local.py").write_text("untracked")
-        (integration / "__pycache__").mkdir()
-        (integration / "__pycache__/local.pyc").write_bytes(b"untracked")
-        self.archive = self.repository / "dist/delonghi_comfort.zip"
+    result = build(repository, sha=sha)
 
-    def git(self, *args):
-        return subprocess.check_output(
-            ["git", "-C", str(self.repository), *args], stderr=subprocess.STDOUT
-        )
+    assert result.returncode != 0
+    assert expected_error in result.stderr
+    assert not archive.exists()
 
-    def commit(self):
-        self.git(
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "Test release",
-        )
 
-    def build(self, tag="v1.2.3", sha=None):
-        return subprocess.run(
-            ["bash", "-c", BUILD],
-            cwd=self.repository,
-            env={**os.environ, "RELEASE_TAG": tag, "RELEASE_SHA": sha or self.sha},
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+@pytest.mark.parametrize("member", ("bytecode", "symlink", "backslash"))
+def test_tracked_bytecode_symlinks_and_unsafe_paths_are_rejected(
+    repository,
+    archive,
+    member,
+):
+    integration = repository / "custom_components/delonghi_comfort"
+    (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
+    if member == "bytecode":
+        path = integration / "stale.pyc"
+        path.write_bytes(b"tracked bytecode")
+    elif member == "symlink":
+        path = integration / "linked.py"
+        path.symlink_to("__init__.py")
+    else:
+        path = integration / "..\\escape.py"
+        path.write_text("outside")
 
-    def test_exact_layout_uses_committed_revision_and_is_reproducible(self):
-        result = self.build()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        with ZipFile(self.archive) as archive:
-            self.assertEqual(
-                {name for name in archive.namelist() if not name.endswith("/")},
-                {
-                    "manifest.json",
-                    "__init__.py",
-                    "translations/ja.json",
-                    "LICENSE",
-                    "NOTICE",
-                },
-            )
-            self.assertEqual(
-                json.loads(archive.read("manifest.json"))["version"], "1.2.3"
-            )
-            self.assertEqual(archive.read("LICENSE"), b"LICENSE")
-            destination = self.repository / "config/custom_components/delonghi_comfort"
-            archive.extractall(destination)
-            self.assertTrue((destination / "manifest.json").is_file())
-            self.assertFalse((destination / "delonghi_comfort").exists())
-        first = self.archive.read_bytes()
-        self.assertEqual(self.build().returncode, 0)
-        self.assertEqual(self.archive.read_bytes(), first)
+    git(repository, "add", "custom_components/delonghi_comfort/manifest.json")
+    git(repository, "add", str(path.relative_to(repository)))
+    commit(repository)
+    sha = git(repository, "rev-parse", "HEAD").decode().strip()
 
-    def test_invalid_tag_revision_and_version_mismatch_fail(self):
-        for tag, sha in (
-            ("v1.2.4", self.sha),
-            ("1.2.3", self.sha),
-            ("v1.2.3;exit", self.sha),
-            ("v1.2.3", "main"),
-            ("v1.2.3", "f" * 40),
-        ):
-            with self.subTest(tag=tag, sha=sha):
-                self.assertNotEqual(self.build(tag, sha).returncode, 0)
-                self.assertFalse(self.archive.exists())
+    result = build(repository, sha=sha)
 
-    def test_version_file_and_required_notices_are_checked(self):
-        (
-            self.repository / "custom_components/delonghi_comfort/manifest.json"
-        ).write_text(json.dumps({"version": "1.2.3"}))
-        self.git("add", "custom_components/delonghi_comfort/manifest.json")
-        for path, content in (("version.txt", "8.0.0"), ("NOTICE", None)):
-            with self.subTest(path=path):
-                target = self.repository / path
-                if content is None:
-                    target.unlink()
-                else:
-                    target.write_text(content)
-                self.git("add", path)
-                self.commit()
-                sha = self.git("rev-parse", "HEAD").decode().strip()
-                result = self.build(sha=sha)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn(
-                    "version files disagree" if content is not None else "NOTICE",
-                    result.stderr,
-                )
-                self.assertFalse(self.archive.exists())
-                # Restore for the next independent failure case.
-                target.write_text("1.2.3\n" if path == "version.txt" else path)
-                self.git("add", path)
-                self.commit()
+    assert result.returncode != 0
+    assert "Unexpected integration archive member" in result.stderr
+    assert not archive.exists()
 
-    def test_tracked_bytecode_and_symlinks_are_rejected(self):
-        integration = self.repository / "custom_components/delonghi_comfort"
-        (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
-        for path in (integration / "stale.pyc", integration / "linked.py"):
-            with self.subTest(path=path.name):
-                if path.suffix == ".pyc":
-                    path.write_bytes(b"tracked bytecode")
-                else:
-                    path.symlink_to("__init__.py")
-                self.git(
-                    "add",
-                    "custom_components/delonghi_comfort/manifest.json",
-                    str(path.relative_to(self.repository)),
-                )
-                self.commit()
-                sha = self.git("rev-parse", "HEAD").decode().strip()
-                result = self.build(sha=sha)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("Unexpected integration archive member", result.stderr)
-                path.unlink()
-                self.git("add", str(path.relative_to(self.repository)))
-                self.commit()
 
-    def test_release_configuration_keeps_publication_manual(self):
-        manifest = json.loads(
-            (ROOT / "custom_components/delonghi_comfort/manifest.json").read_text()
-        )
-        baseline = json.loads((ROOT / ".release-please-manifest.json").read_text())
-        self.assertEqual(manifest["version"], baseline["."])
-        self.assertEqual(
-            manifest["version"], (ROOT / "version.txt").read_text().strip()
-        )
-        config = json.loads((ROOT / "release-please-config.json").read_text())
-        self.assertTrue(config["packages"]["."]["draft"])
-        self.assertTrue(config["packages"]["."]["force-tag-creation"])
-        self.assertFalse(config["packages"]["."]["include-component-in-tag"])
-        self.assertEqual(
-            config["packages"]["."]["extra-files"],
-            [
-                {
-                    "type": "json",
-                    "path": "custom_components/delonghi_comfort/manifest.json",
-                    "jsonpath": "$.version",
-                }
-            ],
-        )
-        steps = WORKFLOW["jobs"]["release"]["steps"]
-        release = next(step for step in steps if step.get("id") == "release")
-        self.assertNotIn("skip-github-release", release["with"])
-        self.assertNotIn("DELONGHI_RELEASE_APPROVED", json.dumps(WORKFLOW))
-        hacs = json.loads((ROOT / "hacs.json").read_text())
-        self.assertTrue(hacs["zip_release"])
-        self.assertEqual(hacs["filename"], self.archive.name)
+def test_release_configuration_keeps_publication_manual(archive):
+    manifest = json.loads(
+        (ROOT / "custom_components/delonghi_comfort/manifest.json").read_text()
+    )
+    baseline = json.loads((ROOT / ".release-please-manifest.json").read_text())
+    assert manifest["version"] == baseline["."]
+    assert manifest["version"] == (ROOT / "version.txt").read_text().strip()
+    config = json.loads((ROOT / "release-please-config.json").read_text())
+    assert config["packages"]["."]["draft"]
+    assert config["packages"]["."]["force-tag-creation"]
+    assert not config["packages"]["."]["include-component-in-tag"]
+    assert config["packages"]["."]["extra-files"] == [
+        {
+            "type": "json",
+            "path": "custom_components/delonghi_comfort/manifest.json",
+            "jsonpath": "$.version",
+        }
+    ]
+    steps = WORKFLOW["jobs"]["release"]["steps"]
+    release = next(step for step in steps if step.get("id") == "release")
+    assert "skip-github-release" not in release["with"]
+    assert "DELONGHI_RELEASE_APPROVED" not in json.dumps(WORKFLOW)
+    hacs = json.loads((ROOT / "hacs.json").read_text())
+    assert hacs["zip_release"]
+    assert hacs["filename"] == archive.name
 
-    def test_missing_app_configuration_fails_without_exposing_secrets(self):
-        require_app = WORKFLOW["jobs"]["release"]["steps"][0]["run"]
-        for app_id, private_key in (("", ""), ("123", ""), ("", "private-test-value")):
-            with self.subTest(app_id=app_id, has_key=bool(private_key)):
-                result = subprocess.run(
-                    ["bash", "-c", require_app],
-                    env={
-                        **os.environ,
-                        "APP_ID": app_id,
-                        "APP_PRIVATE_KEY": private_key,
-                    },
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertNotEqual(result.returncode, 0)
-                self.assertNotIn("private-test-value", result.stdout + result.stderr)
 
-    def test_existing_tag_history_uses_an_explicit_migration_boundary(self):
-        config = json.loads((ROOT / "release-please-config.json").read_text())
-        self.assertNotIn("bootstrap-sha", config)
-        self.assertEqual(
-            config["last-release-sha"],
-            "7e7549741e1fdbcbd4e70559c494365f847c3949",
-        )
+@pytest.mark.parametrize(
+    ("app_id", "private_key"),
+    (("", ""), ("123", ""), ("", "private-test-value")),
+)
+def test_missing_app_configuration_fails_without_exposing_secrets(
+    app_id,
+    private_key,
+):
+    require_app = WORKFLOW["jobs"]["release"]["steps"][0]["run"]
+    result = subprocess.run(
+        ["bash", "-c", require_app],
+        env={
+            **os.environ,
+            "APP_ID": app_id,
+            "APP_PRIVATE_KEY": private_key,
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
-    def test_release_event_and_packaging_are_wired_to_one_immutable_commit(self):
-        # PyYAML's YAML 1.1 loader treats the unquoted GitHub Actions "on" key as True.
-        events = WORKFLOW[True]
-        self.assertEqual(events["push"]["branches"], ["main"])
-        self.assertNotIn("tags", events["push"])
-        jobs = WORKFLOW["jobs"]
-        self.assertEqual(jobs["package"]["needs"], "release")
-        self.assertEqual(
-            jobs["package"]["if"], "needs.release.outputs.release_created == 'true'"
-        )
-        checkout = jobs["package"]["steps"][0]
-        self.assertEqual(checkout["with"]["ref"], "${{ needs.release.outputs.sha }}")
-        self.assertEqual(
-            jobs["release"]["outputs"]["sha"], "${{ steps.release.outputs.sha }}"
-        )
-        upload = jobs["package"]["steps"][-1]
-        self.assertIn("--json isDraft", upload["run"])
-        self.assertIn("gh release upload", upload["run"])
-        self.assertNotIn("gh release create", upload["run"])
+    assert result.returncode != 0
+    assert "private-test-value" not in result.stdout + result.stderr
+
+
+def test_existing_tag_history_uses_an_explicit_migration_boundary():
+    config = json.loads((ROOT / "release-please-config.json").read_text())
+    assert "bootstrap-sha" not in config
+    assert config["last-release-sha"] == "7e7549741e1fdbcbd4e70559c494365f847c3949"
+
+
+def test_release_event_and_packaging_are_wired_to_one_immutable_commit():
+    # PyYAML's YAML 1.1 loader treats the unquoted GitHub Actions "on" key as True.
+    events = WORKFLOW[True]
+    assert events["push"]["branches"] == ["main"]
+    assert "tags" not in events["push"]
+    jobs = WORKFLOW["jobs"]
+    assert jobs["package"]["needs"] == "release"
+    assert jobs["package"]["if"] == "needs.release.outputs.release_created == 'true'"
+    checkout = jobs["package"]["steps"][0]
+    assert checkout["with"]["ref"] == "${{ needs.release.outputs.sha }}"
+    assert jobs["release"]["outputs"]["sha"] == "${{ steps.release.outputs.sha }}"
+    upload = jobs["package"]["steps"][-1]
+    assert "--json isDraft" in upload["run"]
+    assert "gh release upload" in upload["run"]
+    assert "gh release create" not in upload["run"]
+    assert "python scripts/build_release.py" in jobs["package"]["steps"][-2]["run"]
+
+
+def test_manual_recovery_only_replaces_an_existing_draft_zip():
+    events = WORKFLOW[True]
+    assert "release_tag" in events["workflow_dispatch"]["inputs"]
+    recovery = WORKFLOW["jobs"]["recover"]
+    assert recovery["if"] == (
+        "github.event_name == 'workflow_dispatch' && "
+        "github.ref == 'refs/heads/main' && inputs.release_tag != ''"
+    )
+    assert recovery["permissions"] == {"contents": "write"}
+    steps = recovery["steps"]
+    draft_check = next(
+        step["run"]
+        for step in steps
+        if step.get("name") == "Validate release tag and draft status"
+    )
+    assert "isDraft" in draft_check
+    assert steps[0]["with"]["ref"] == "${{ github.sha }}"
+    assert "--clobber" in steps[-1]["run"]
+    assert "gh release view" in steps[-1]["run"]

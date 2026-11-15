@@ -1,7 +1,7 @@
 name: PR title
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [main, master]
     types: [opened, edited, reopened, synchronize]
 
@@ -12,13 +12,19 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version-file: .python-version
+      - uses: actions/checkout@v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
+          path: base
+          persist-credentials: false
       - name: Validate pull request title
-        run: python scripts/check_pr_title.py
+        run: python -m scripts.check_pr_title
+        working-directory: base
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
