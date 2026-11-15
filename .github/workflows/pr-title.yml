@@ -14,12 +14,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4.4.0
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       - uses: actions/setup-python@v5.6.0
         with:
-          python-version: "3.14.10"
+          python-version-file: .python-version
+      - uses: actions/checkout@v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
       - name: Validate pull request title
         run: python -m scripts.check_pr_title
+        working-directory: base
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
