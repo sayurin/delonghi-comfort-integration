@@ -1,8 +1,8 @@
-"""Offline tests for supported models, setup retries and coordinator failures."""
+"""Offline tests for setup retries and coordinator failures."""
 
-import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
+import logging
 
+import pytest
 from homeassistant.exceptions import (
     ConfigEntryAuthFailed,
     ConfigEntryError,
@@ -20,100 +20,120 @@ from custom_components.delonghi_comfort.coordinator import DeLonghiCoordinator
 MODULE = "custom_components.delonghi_comfort"
 
 
-class SetupTests(unittest.IsolatedAsyncioTestCase):
-    """Use only allowlisted heaters and preserve the entry lifecycle."""
+@pytest.fixture
+def setup_context(mocker):
+    hass = mocker.MagicMock()
+    hass.data = {}
+    hass.config_entries.async_forward_entry_setups = mocker.AsyncMock()
+    entry = mocker.MagicMock()
+    entry.entry_id = "test-entry"
+    entry.data = {
+        "username": "test@example.invalid",
+        "password": "test-password",
+    }
+    api = mocker.MagicMock()
+    api.authenticate = mocker.AsyncMock(return_value=True)
+    api.get_devices = mocker.AsyncMock()
+    coordinator = mocker.MagicMock()
+    coordinator.async_config_entry_first_refresh = mocker.AsyncMock()
+    for target, result in (
+        ("DeLonghiAPI", api),
+        ("async_get_clientsession", mocker.MagicMock()),
+        ("DeLonghiCoordinator", coordinator),
+    ):
+        mocker.patch(f"{MODULE}.{target}", return_value=result)
+    return hass, entry, api, coordinator
 
-    def setUp(self):
-        self.hass = MagicMock()
-        self.hass.data = {}
-        self.hass.config_entries.async_forward_entry_setups = AsyncMock()
-        self.entry = MagicMock()
-        self.entry.entry_id = "test-entry"
-        self.entry.data = {
-            "username": "test@example.invalid",
-            "password": "test-password",
-        }
-        self.api = MagicMock()
-        self.api.authenticate = AsyncMock(return_value=True)
-        self.api.get_devices = AsyncMock()
-        self.coordinator = MagicMock()
-        self.coordinator.async_config_entry_first_refresh = AsyncMock()
-        for target, result in (
-            ("DeLonghiAPI", self.api),
-            ("async_get_clientsession", MagicMock()),
-            ("DeLonghiCoordinator", self.coordinator),
-        ):
-            patcher = patch(f"{MODULE}.{target}", return_value=result)
-            patcher.start()
-            self.addCleanup(patcher.stop)
 
-    async def test_mixed_account_initializes_only_heater(self):
-        heater = {"device": {"dsn": "test-heater", "oem_model": "DL-heater"}}
-        self.api.get_devices.return_value = [
-            heater,
-            {"device": {"dsn": "test-unknown", "oem_model": "unknown"}},
+async def test_mixed_account_initializes_only_heater(setup_context, caplog):
+    hass, entry, api, coordinator = setup_context
+    api.get_devices.return_value = [
+        {"device": {"dsn": "test-heater", "oem_model": "DL-heater"}},
+        {"device": {"dsn": "test-unknown", "oem_model": "unknown"}},
+    ]
+
+    with caplog.at_level(logging.WARNING, logger=MODULE):
+        assert await async_setup_entry(hass, entry)
+
+    assert "test-unknown" not in caplog.text
+    data = hass.data["delonghi_comfort"]["test-entry"]
+    assert set(data) == {"heater_coordinators"}
+    assert data["heater_coordinators"] == [coordinator]
+    coordinator.async_config_entry_first_refresh.assert_awaited_once()
+
+
+async def test_unknown_only_account_creates_no_entities(setup_context, caplog):
+    hass, entry, api, coordinator = setup_context
+    api.get_devices.return_value = [{"device": {"dsn": "unknown"}}]
+
+    with caplog.at_level(logging.WARNING, logger=MODULE):
+        with pytest.raises(ConfigEntryError):
+            await async_setup_entry(hass, entry)
+
+    hass.config_entries.async_forward_entry_setups.assert_not_awaited()
+    coordinator.async_config_entry_first_refresh.assert_not_awaited()
+    assert hass.data == {}
+
+
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    (
+        (DeLonghiAuthenticationError, ConfigEntryAuthFailed),
+        (DeLonghiConnectionError, ConfigEntryNotReady),
+    ),
+)
+async def test_auth_failure_and_outage_have_distinct_ha_errors(
+    setup_context,
+    error,
+    expected,
+):
+    _hass, entry, api, _coordinator = setup_context
+    api.authenticate.side_effect = error("sanitized")
+
+    with pytest.raises(expected):
+        await async_setup_entry(_hass, entry)
+
+
+async def test_empty_devices_retry_instead_of_succeeding(setup_context):
+    hass, entry, api, _coordinator = setup_context
+    api.get_devices.return_value = []
+
+    with pytest.raises(ConfigEntryNotReady):
+        await async_setup_entry(hass, entry)
+
+
+async def test_failed_platform_unload_keeps_entry_data(setup_context, mocker):
+    hass, entry, _api, _coordinator = setup_context
+    hass.data = {"delonghi_comfort": {"test-entry": {"preserved": True}}}
+    hass.config_entries.async_unload_platforms = mocker.AsyncMock(return_value=False)
+    assert not await async_unload_entry(hass, entry)
+    assert "test-entry" in hass.data["delonghi_comfort"]
+
+    hass.config_entries.async_unload_platforms.return_value = True
+    assert await async_unload_entry(hass, entry)
+    assert "test-entry" not in hass.data["delonghi_comfort"]
+
+
+async def test_coordinator_properties_and_failure_classification(mocker):
+    coordinator = mocker.MagicMock()
+    coordinator.api.get_device_properties = mocker.AsyncMock(
+        return_value=[
+            {"property": {"name": "room_temp", "value": 20.5}},
+            {"property": {"name": "future_property", "value": "unknown"}},
         ]
-        with self.assertLogs(MODULE, level="WARNING") as logs:
-            self.assertTrue(await async_setup_entry(self.hass, self.entry))
-        self.assertNotIn("test-unknown", "\n".join(logs.output))
-        data = self.hass.data["delonghi_comfort"]["test-entry"]
-        self.assertEqual(set(data), {"heater_coordinators"})
-        self.assertEqual(data["heater_coordinators"], [self.coordinator])
-        self.coordinator.async_config_entry_first_refresh.assert_awaited_once()
+    )
 
-    async def test_unknown_only_account_creates_no_entities(self):
-        self.api.get_devices.return_value = [{"device": {"dsn": "unknown"}}]
-        with self.assertLogs(MODULE, level="WARNING"):
-            with self.assertRaises(ConfigEntryError):
-                await async_setup_entry(self.hass, self.entry)
-        self.hass.config_entries.async_forward_entry_setups.assert_not_awaited()
-        self.coordinator.async_config_entry_first_refresh.assert_not_awaited()
-        self.assertEqual(self.hass.data, {})
+    data = await DeLonghiCoordinator._async_update_data(coordinator)
+    assert data == {"room_temp": 20.5, "future_property": "unknown"}
 
-    async def test_auth_failure_and_outage_have_distinct_ha_errors(self):
-        for error, expected in (
-            (DeLonghiAuthenticationError, ConfigEntryAuthFailed),
-            (DeLonghiConnectionError, ConfigEntryNotReady),
-        ):
-            self.api.authenticate.side_effect = error("sanitized")
-            with self.assertRaises(expected):
-                await async_setup_entry(self.hass, self.entry)
+    coordinator.api.get_device_properties.return_value = []
+    with pytest.raises(UpdateFailed):
+        await DeLonghiCoordinator._async_update_data(coordinator)
 
-    async def test_empty_devices_retry_instead_of_succeeding(self):
-        self.api.get_devices.return_value = []
-        with self.assertRaises(ConfigEntryNotReady):
-            await async_setup_entry(self.hass, self.entry)
-
-    async def test_failed_platform_unload_keeps_entry_data(self):
-        self.hass.data = {"delonghi_comfort": {"test-entry": {"preserved": True}}}
-        self.hass.config_entries.async_unload_platforms = AsyncMock(return_value=False)
-        self.assertFalse(await async_unload_entry(self.hass, self.entry))
-        self.assertIn("test-entry", self.hass.data["delonghi_comfort"])
-        self.hass.config_entries.async_unload_platforms.return_value = True
-        self.assertTrue(await async_unload_entry(self.hass, self.entry))
-        self.assertNotIn("test-entry", self.hass.data["delonghi_comfort"])
-
-
-class CoordinatorTests(unittest.IsolatedAsyncioTestCase):
-    """Check polling error mapping without connecting to a device."""
-
-    async def test_properties_and_failure_classification(self):
-        coordinator = MagicMock()
-        coordinator.api.get_device_properties = AsyncMock(
-            return_value=[
-                {"property": {"name": "room_temp", "value": 20.5}},
-                {"property": {"name": "future_property", "value": "unknown"}},
-            ]
-        )
-        data = await DeLonghiCoordinator._async_update_data(coordinator)
-        self.assertEqual(data, {"room_temp": 20.5, "future_property": "unknown"})
-        coordinator.api.get_device_properties.return_value = []
-        with self.assertRaises(UpdateFailed):
+    for error, expected in (
+        (DeLonghiAuthenticationError, ConfigEntryAuthFailed),
+        (DeLonghiConnectionError, UpdateFailed),
+    ):
+        coordinator.api.get_device_properties.side_effect = error("sanitized")
+        with pytest.raises(expected):
             await DeLonghiCoordinator._async_update_data(coordinator)
-        for error, expected in (
-            (DeLonghiAuthenticationError, ConfigEntryAuthFailed),
-            (DeLonghiConnectionError, UpdateFailed),
-        ):
-            coordinator.api.get_device_properties.side_effect = error("sanitized")
-            with self.assertRaises(expected):
-                await DeLonghiCoordinator._async_update_data(coordinator)

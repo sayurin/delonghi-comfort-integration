@@ -10,6 +10,7 @@ dev = [
     "pre-commit-hooks",
     "prek",
     "pytest-cov",
+    "pytest-mock",
     "PyYAML",
     "ruff",
 ]

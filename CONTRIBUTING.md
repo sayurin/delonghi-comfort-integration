@@ -55,8 +55,9 @@ The Home Assistant test plugin version is locked to the corresponding Home
 Assistant release. Upgrade those versions together when refreshing the
 development lockfile. Install the `gh actions-lock` extension at v0.4.1 to
 update workflow pins; do not edit `.github/workflows/actions.lock` by hand.
-Pytest runs the existing `unittest.TestCase` regressions as well as native
-pytest lifecycle tests using the plugin's `hass` and `MockConfigEntry` helpers.
+Tests use pytest functions, parametrization, and fixtures throughout. The
+`pytest-mock` fixture provides mocks, while `pytest-homeassistant` supplies the
+`hass` and `MockConfigEntry` helpers for Home Assistant lifecycle tests.
 
 ## Draft release recovery
 

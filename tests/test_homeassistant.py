@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -18,6 +17,7 @@ async def test_config_entry_sets_up_heater_entities(
     hass: HomeAssistant,
     enable_custom_integrations: None,
     entity_registry: er.EntityRegistry,
+    mocker,
 ) -> None:
     """Load the integration in Home Assistant and register its entities."""
     entry = MockConfigEntry(
@@ -26,20 +26,19 @@ async def test_config_entry_sets_up_heater_entities(
     )
     entry.add_to_hass(hass)
 
-    api = MagicMock()
-    api.authenticate = AsyncMock(return_value=True)
-    api.get_devices = AsyncMock(
+    api = mocker.MagicMock()
+    api.authenticate = mocker.AsyncMock(return_value=True)
+    api.get_devices = mocker.AsyncMock(
         return_value=[
             {"device": {"dsn": "test-dsn", "oem_model": "DL-heater"}},
         ]
     )
-    api.get_device_properties = AsyncMock(
+    api.get_device_properties = mocker.AsyncMock(
         return_value=json.loads((FIXTURE_DIR / "heater_properties.json").read_text())
     )
 
-    with patch("custom_components.delonghi_comfort.DeLonghiAPI", return_value=api):
-        assert await hass.config_entries.async_setup(entry.entry_id)
-
+    mocker.patch("custom_components.delonghi_comfort.DeLonghiAPI", return_value=api)
+    assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED
