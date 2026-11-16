@@ -59,12 +59,16 @@ Tests use pytest functions, parametrization, and fixtures throughout. The
 `pytest-mock` fixture provides mocks, while `pytest-homeassistant` supplies the
 `hass` and `MockConfigEntry` helpers for Home Assistant lifecycle tests.
 
-## Draft release recovery
+## Pre-release recovery
 
-The Release workflow normally creates a draft from a Release Please PR. To
-rebuild a missing or invalid ZIP, manually run the workflow with the existing
-draft tag (for example, `v0.2.1`). The workflow verifies the tag, committed
-manifest/version, and draft status before replacing `delonghi_comfort.zip`.
-The same-named asset is replaced with `--clobber`; do not run recovery while
-someone is publishing the release. Published releases are not valid recovery
-targets, and publication remains a human action.
+Release Please creates a public pre-release and tag when its release PR is
+merged. Before merging, review the release notes and state that pre-releases
+may be delivered to HACS users who enable them. Do not mark the release as
+latest; promote it to a stable release only after human verification.
+
+To recover a missing ZIP, manually run the Release workflow on `main` with the
+existing published pre-release tag (for example, `v0.2.1`). The workflow checks
+out that tag and verifies its revision, version, and pre-release status before
+building. It adds `delonghi_comfort.zip` only when missing; an existing asset
+must match byte-for-byte or recovery fails. Never run recovery while someone
+is promoting the release.
