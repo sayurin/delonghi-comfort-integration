@@ -191,7 +191,7 @@ def test_tracked_bytecode_symlinks_and_unsafe_paths_are_rejected(
     assert not archive.exists()
 
 
-def test_release_configuration_keeps_publication_manual(archive):
+def test_release_configuration_publishes_a_prerelease(archive):
     manifest = json.loads(
         (ROOT / "custom_components/delonghi_comfort/manifest.json").read_text()
     )
@@ -199,7 +199,8 @@ def test_release_configuration_keeps_publication_manual(archive):
     assert manifest["version"] == baseline["."]
     assert manifest["version"] == (ROOT / "version.txt").read_text().strip()
     config = json.loads((ROOT / "release-please-config.json").read_text())
-    assert config["packages"]["."]["draft"]
+    assert not config["packages"]["."]["draft"]
+    assert config["packages"]["."]["prerelease"]
     assert config["packages"]["."]["force-tag-creation"]
     assert not config["packages"]["."]["include-component-in-tag"]
     assert config["packages"]["."]["extra-files"] == [
@@ -209,6 +210,7 @@ def test_release_configuration_keeps_publication_manual(archive):
             "jsonpath": "$.version",
         }
     ]
+    assert WORKFLOW["jobs"]["release"]["if"] == "github.event_name == 'push'"
     steps = WORKFLOW["jobs"]["release"]["steps"]
     release = next(step for step in steps if step.get("id") == "release")
     assert "skip-github-release" not in release["with"]
@@ -249,40 +251,42 @@ def test_existing_tag_history_uses_an_explicit_migration_boundary():
     assert config["last-release-sha"] == "7e7549741e1fdbcbd4e70559c494365f847c3949"
 
 
-def test_release_event_and_packaging_are_wired_to_one_immutable_commit():
+def test_release_and_packaging_are_wired_to_one_immutable_commit():
     # PyYAML's YAML 1.1 loader treats the unquoted GitHub Actions "on" key as True.
     events = WORKFLOW[True]
     assert events["push"]["branches"] == ["main"]
     assert "tags" not in events["push"]
     jobs = WORKFLOW["jobs"]
-    assert jobs["package"]["needs"] == "release"
-    assert jobs["package"]["if"] == "needs.release.outputs.release_created == 'true'"
+    assert jobs["package"]["needs"] == ["release", "recover"]
+    assert "always()" in jobs["package"]["if"]
+    assert "github.event_name == 'workflow_dispatch'" in jobs["package"]["if"]
+    assert "needs.recover.result == 'success'" in jobs["package"]["if"]
+    assert jobs["recover"]["if"] == (
+        "github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
+    )
+    assert jobs["recover"]["steps"][0]["with"]["ref"] == "${{ github.sha }}"
     checkout = jobs["package"]["steps"][0]
-    assert checkout["with"]["ref"] == "${{ needs.release.outputs.sha }}"
+    assert (
+        checkout["with"]["ref"]
+        == "${{ needs.recover.outputs.sha || needs.release.outputs.sha }}"
+    )
     assert jobs["release"]["outputs"]["sha"] == "${{ steps.release.outputs.sha }}"
-    upload = jobs["package"]["steps"][-1]
-    assert "--json isDraft" in upload["run"]
-    assert "gh release upload" in upload["run"]
-    assert "gh release create" not in upload["run"]
-    assert "python scripts/build_release.py" in jobs["package"]["steps"][-2]["run"]
-
-
-def test_manual_recovery_only_replaces_an_existing_draft_zip():
     events = WORKFLOW[True]
-    assert "release_tag" in events["workflow_dispatch"]["inputs"]
-    recovery = WORKFLOW["jobs"]["recover"]
-    assert recovery["if"] == (
-        "github.event_name == 'workflow_dispatch' && "
-        "github.ref == 'refs/heads/main' && inputs.release_tag != ''"
-    )
-    assert recovery["permissions"] == {"contents": "write"}
-    steps = recovery["steps"]
-    draft_check = next(
-        step["run"]
+    assert events["workflow_dispatch"]["inputs"]["release_tag"]["required"]
+    steps = jobs["package"]["steps"]
+    verify = next(
+        step
         for step in steps
-        if step.get("name") == "Validate release tag and draft status"
+        if step.get("name") == "Verify published pre-release and tag revision"
     )
-    assert "isDraft" in draft_check
-    assert steps[0]["with"]["ref"] == "${{ github.sha }}"
-    assert "--clobber" in steps[-1]["run"]
-    assert "gh release view" in steps[-1]["run"]
+    assert "isPrerelease" in verify["run"]
+    assert "isDraft" in verify["run"]
+    upload = steps[-1]
+    assert "gh release upload" in upload["run"]
+    assert "gh release download" in upload["run"]
+    assert "cmp --silent" in upload["run"]
+    assert "--clobber" not in json.dumps(WORKFLOW)
+    assert "gh release create" not in json.dumps(WORKFLOW)
+    build = next(step for step in steps if step.get("name") == "Build integration ZIP")
+    assert "python scripts/build_release.py" in build["run"]
+    assert "isPrerelease" in jobs["recover"]["steps"][1]["run"]
