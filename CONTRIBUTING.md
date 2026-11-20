@@ -34,15 +34,12 @@ merged commit follows the same convention.
 
 ## Development checks
 
-Use Python 3.14.2 and uv 0.13.1 or later. The two test environments keep the
-minimum supported Home Assistant release and the latest locked release separate:
+Use Python 3.14.2 and uv 0.13.1 or later:
 
 ```shell
-uv sync --locked --extra dev --extra ha-minimum
-uv run --locked --extra dev --extra ha-minimum pytest
-uv sync --locked --extra dev --extra ha-latest
-uv run --locked --extra dev --extra ha-latest pytest
-uv run --locked --extra dev --extra ha-latest prek run --all-files
+uv sync --locked --extra dev
+uv run --locked --extra dev pytest
+uv run --locked --extra dev prek run --all-files
 uv audit --locked
 gh actions-lock
 ```
@@ -51,10 +48,10 @@ The uv project is development-only (`package = false`); its placeholder project
 version is not the integration version. Release Please continues to update the
 integration manifest and `version.txt`.
 
-The Home Assistant test plugin version is locked to the corresponding Home
-Assistant release. Upgrade those versions together when refreshing the
-development lockfile. Install the `gh actions-lock` extension at v0.4.1 to
-update workflow pins; do not edit `.github/workflows/actions.lock` by hand.
+The Home Assistant test plugin and its matching Home Assistant version are
+resolved in the development lockfile. The minimum supported Home Assistant
+version is not separately tested. Install the `gh actions-lock` extension at
+v0.4.1 to update workflow pins; do not edit `.github/workflows/actions.lock` by hand.
 Tests use pytest functions, parametrization, and fixtures throughout. The
 `pytest-mock` fixture provides mocks, while `pytest-homeassistant` supplies the
 `hass` and `MockConfigEntry` helpers for Home Assistant lifecycle tests.
