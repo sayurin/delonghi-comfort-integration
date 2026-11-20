@@ -221,11 +221,11 @@ def test_release_configuration_publishes_a_prerelease(archive):
 
 
 @pytest.mark.parametrize(
-    ("app_id", "private_key"),
-    (("", ""), ("123", ""), ("", "private-test-value")),
+    ("client_id", "private_key"),
+    (("", ""), ("test-client-id", ""), ("", "private-test-value")),
 )
 def test_missing_app_configuration_fails_without_exposing_secrets(
-    app_id,
+    client_id,
     private_key,
 ):
     require_app = WORKFLOW["jobs"]["release"]["steps"][0]["run"]
@@ -233,7 +233,7 @@ def test_missing_app_configuration_fails_without_exposing_secrets(
         ["bash", "-c", require_app],
         env={
             **os.environ,
-            "APP_ID": app_id,
+            "APP_CLIENT_ID": client_id,
             "APP_PRIVATE_KEY": private_key,
         },
         check=False,

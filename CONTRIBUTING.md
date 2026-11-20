@@ -61,6 +61,9 @@ Tests use pytest functions, parametrization, and fixtures throughout. The
 
 ## Pre-release recovery
 
+Set the release GitHub App's Client ID as the `APP_CLIENT_ID` Actions
+variable and its private key as the `APP_PRIVATE_KEY` Actions secret.
+
 Release Please creates a public pre-release and tag when its release PR is
 merged. Before merging, review the release notes and state that pre-releases
 may be delivered to HACS users who enable them. Do not mark the release as
