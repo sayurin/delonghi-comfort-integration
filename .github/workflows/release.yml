@@ -109,10 +109,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: 0.13.1
-      - name: Install minimum-version test environment
-        run: uv sync --locked --extra dev --extra ha-minimum
+      - name: Install test environment
+        run: uv sync --locked --extra dev
       - name: Run offline regression tests
-        run: uv run --locked --extra dev --extra ha-minimum pytest
+        run: uv run --locked --extra dev pytest
       - uses: home-assistant/actions/hassfest@master
       - name: Build integration ZIP
         env:
