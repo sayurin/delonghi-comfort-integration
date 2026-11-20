@@ -12,7 +12,8 @@ from scripts.check_commit_messages import is_conventional_subject, main
         "feat(config-flow): add reauthentication",
         "feat!: remove legacy authentication",
         "fix(auth)!: reject expired tokens",
-        "release: publish a draft",
+        "deps: update a runtime dependency",
+        "chore(main): release 0.2.1",
     ),
 )
 def test_accepts_conventional_commit_subjects(subject):
@@ -23,6 +24,7 @@ def test_accepts_conventional_commit_subjects(subject):
     "subject",
     (
         "Fix: handle expired sessions",
+        "release: publish a draft",
         "fix:",
         "feat(): add reauthentication",
         "feat: add reauthentication\nBREAKING CHANGE: details",

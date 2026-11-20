@@ -13,12 +13,16 @@ from scripts.check_pr_title import is_valid_title
         "feat!: remove legacy authentication",
         "fix(auth)!: reject expired tokens",
         "docs: clarify Marketplace installation",
-        "release: publish a draft",
-        "custom-type(scope with spaces): allow the project-specific type",
+        "deps: update a dependency",
+        "chore(scope with spaces): describe the change",
     ),
 )
 def test_accepts_conventional_commit_titles(title):
     assert is_valid_title(title)
+
+
+def test_rejects_unsupported_commit_type():
+    assert not is_valid_title("release: publish a preview")
 
 
 @pytest.mark.parametrize(

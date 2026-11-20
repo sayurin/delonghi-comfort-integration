@@ -9,7 +9,8 @@ titles:
 <type>(<optional-scope>)<optional-!>: <description>
 ```
 
-Use any lowercase type name; the examples below are not an exhaustive list.
+Use one of `feat`, `fix`, `perf`, `deps`, `revert`, `docs`, `style`, `chore`,
+`refactor`, `test`, `build`, or `ci`.
 The scope and `!` are optional. Use `!` to mark a breaking change. Keep the
 description concise and start it with a verb.
 
@@ -27,8 +28,7 @@ Release Please uses commit messages on `main` to determine the next version:
 Use other types for changes that do not add a user-facing feature or fix.
 
 Pull request titles must follow the same format and pass the **PR title** check.
-Any lowercase Conventional Commit type is accepted; the check does not limit
-the type list. Non-merge commits in a pull request are checked as well. When
+Non-merge commits in a pull request are checked as well. When
 squash-merging, use the pull request title as the squash commit subject so the
 merged commit follows the same convention.
 
