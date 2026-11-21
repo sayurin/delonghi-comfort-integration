@@ -45,8 +45,11 @@ gh actions-lock
 ```
 
 The uv project is development-only (`package = false`); its placeholder project
-version is not the integration version. Release Please continues to update the
-integration manifest and `version.txt`.
+version is not the integration version. Release Please updates `version.txt`
+and its own version manifest. The committed integration manifest stays at
+`0.0.0`; the verified tag version is inserted into the release ZIP only.
+Install the ZIP rather than the tag's source archive to obtain the release
+version.
 
 The Home Assistant test plugin and its matching Home Assistant version are
 resolved in the development lockfile. The minimum supported Home Assistant

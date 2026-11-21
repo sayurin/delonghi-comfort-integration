@@ -39,13 +39,16 @@ def repository(tmp_path):
     git(tmp_path, "init", "--initial-branch=main")
     integration = tmp_path / "custom_components/delonghi_comfort"
     integration.mkdir(parents=True)
-    (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
+    (integration / "manifest.json").write_bytes(
+        (ROOT / "custom_components/delonghi_comfort/manifest.json").read_bytes()
+    )
     (integration / "__init__.py").write_text('"""Test integration."""\n')
     (integration / "translations").mkdir()
     (integration / "translations/ja.json").write_text("{}")
     for name in ("LICENSE", "NOTICE"):
         (tmp_path / name).write_text(name)
     (tmp_path / "version.txt").write_text("1.2.3\n")
+    (tmp_path / ".release-please-manifest.json").write_text(json.dumps({".": "1.2.3"}))
     (tmp_path / "INTEGRATION-REBUILD-PLAN.md").write_text("Private plan")
     git(tmp_path, "add", ".")
     commit(tmp_path)
@@ -99,6 +102,14 @@ def test_exact_layout_uses_committed_revision_and_is_reproducible(
             "NOTICE",
         }
         assert json.loads(zip_file.read("manifest.json"))["version"] == "1.2.3"
+        committed_manifest = git(
+            repository,
+            "show",
+            f"{release_sha}:custom_components/delonghi_comfort/manifest.json",
+        )
+        assert zip_file.read("manifest.json") == committed_manifest.replace(
+            b'"version": "0.0.0"', b'"version": "1.2.3"'
+        )
         assert zip_file.read("LICENSE") == b"LICENSE"
         destination = repository / "config/custom_components/delonghi_comfort"
         zip_file.extractall(destination)
@@ -135,6 +146,7 @@ def test_invalid_tag_revision_and_version_mismatch_fail(
     ("path", "content", "expected_error"),
     (
         ("version.txt", "8.0.0", "version files disagree"),
+        (".release-please-manifest.json", '{".": "1.2.2"}', "version files disagree"),
         ("NOTICE", None, "NOTICE"),
     ),
 )
@@ -161,6 +173,31 @@ def test_version_file_and_required_notices_are_checked(
     assert not archive.exists()
 
 
+@pytest.mark.parametrize(
+    ("content", "error"),
+    (
+        ('{\n  "version": "1.2.3"\n}\n', "Committed manifest version must be 0.0.0"),
+        (
+            '{\n  "version": "0.0.0",\n  "version": "0.0.0"\n}\n',
+            "Expected exactly one manifest version placeholder",
+        ),
+    ),
+)
+def test_invalid_manifest_placeholder_fails(repository, archive, content, error):
+    (repository / "custom_components/delonghi_comfort/manifest.json").write_text(
+        content
+    )
+    git(repository, "add", "custom_components/delonghi_comfort/manifest.json")
+    commit(repository)
+    sha = git(repository, "rev-parse", "HEAD").decode().strip()
+
+    result = build(repository, sha=sha)
+
+    assert result.returncode != 0
+    assert error in result.stderr
+    assert not archive.exists()
+
+
 @pytest.mark.parametrize("member", ("bytecode", "symlink", "backslash"))
 def test_tracked_bytecode_symlinks_and_unsafe_paths_are_rejected(
     repository,
@@ -168,7 +205,9 @@ def test_tracked_bytecode_symlinks_and_unsafe_paths_are_rejected(
     member,
 ):
     integration = repository / "custom_components/delonghi_comfort"
-    (integration / "manifest.json").write_text(json.dumps({"version": "1.2.3"}))
+    (integration / "manifest.json").write_bytes(
+        (ROOT / "custom_components/delonghi_comfort/manifest.json").read_bytes()
+    )
     if member == "bytecode":
         path = integration / "stale.pyc"
         path.write_bytes(b"tracked bytecode")
@@ -196,20 +235,14 @@ def test_release_configuration_publishes_a_prerelease(archive):
         (ROOT / "custom_components/delonghi_comfort/manifest.json").read_text()
     )
     baseline = json.loads((ROOT / ".release-please-manifest.json").read_text())
-    assert manifest["version"] == baseline["."]
-    assert manifest["version"] == (ROOT / "version.txt").read_text().strip()
+    assert manifest["version"] == "0.0.0"
+    assert baseline["."] == (ROOT / "version.txt").read_text().strip()
     config = json.loads((ROOT / "release-please-config.json").read_text())
     assert not config["packages"]["."]["draft"]
     assert config["packages"]["."]["prerelease"]
     assert config["packages"]["."]["force-tag-creation"]
     assert not config["packages"]["."]["include-component-in-tag"]
-    assert config["packages"]["."]["extra-files"] == [
-        {
-            "type": "json",
-            "path": "custom_components/delonghi_comfort/manifest.json",
-            "jsonpath": "$.version",
-        }
-    ]
+    assert "extra-files" not in config["packages"]["."]
     assert WORKFLOW["jobs"]["release"]["if"] == "github.event_name == 'push'"
     steps = WORKFLOW["jobs"]["release"]["steps"]
     release = next(step for step in steps if step.get("id") == "release")
