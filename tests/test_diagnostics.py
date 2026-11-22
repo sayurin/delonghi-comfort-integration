@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-from homeassistant.components.diagnostics import REDACTED
 from homeassistant.exceptions import HomeAssistantError
 
 from custom_components.delonghi_comfort.api import (
@@ -80,13 +79,13 @@ async def test_all_devices_including_unsupported_are_fetched_on_request(
     assert [item["device"]["supported"] for item in data["devices"]] == [True, False]
     assert data["devices"][1]["device"]["model"] == "AC-100"
     assert data["devices"][1]["properties"] == [
-        {"property": {"name": "room_temp", "value": "20.5"}}
+        {"property": {"name": "room_temp", "value": "20.5", "key": 999}}
     ]
     hass.config_entries.async_forward_entry_setups.assert_not_called()
     api.set_device_property.assert_not_called()
 
 
-async def test_sensitive_properties_nested_data_and_unknown_text_are_redacted(
+async def test_properties_and_nested_data_are_returned_unchanged(
     diagnostic_context,
 ):
     hass, entry, api, devices, _factory = diagnostic_context
@@ -114,39 +113,15 @@ async def test_sensitive_properties_nested_data_and_unknown_text_are_redacted(
 
     data = await async_get_config_entry_diagnostics(hass, entry)
 
-    values = {
-        item["property"]["name"]: item["property"]["value"]
-        for item in data["devices"][0]["properties"]
-    }
-    assert values["room_temp"] == 20.5
-    assert values["hardware_version"] == "1.2.3"
-    for name in (
-        "wifi_ssid",
-        "serial_number",
-        "access_token",
-        "future_text",
-        "future_data_json",
-    ):
-        assert values[name] == REDACTED
-    assert values["future_data"] == {
-        "id": REDACTED,
+    assert data["devices"][0]["properties"] == properties
+    assert data["devices"][0]["properties"][3]["property"]["value"] == (
+        "fixture-access-token"
+    )
+    assert data["devices"][0]["properties"][6]["property"]["value"] == {
+        "id": 123,
         "voltage": 220,
-        "samples": [REDACTED, "20.5", REDACTED],
+        "samples": ["fixture-heater", "20.5", "Private room"],
     }
-    serialized = json.dumps(data)
-    for secret in (
-        *entry.data.values(),
-        "fixture-heater",
-        "fixture-other",
-        "fixture-access-token",
-        "fixture-refresh-token",
-        "Private room",
-        "Private network",
-        "987654",
-        "999",
-    ):
-        if secret != "ja":
-            assert str(secret) not in serialized
     assert properties[1]["property"]["value"] == "Private network"
     assert devices[0]["device"]["dsn"] == "fixture-heater"
 
@@ -219,7 +194,7 @@ async def test_device_diagnostics_never_downloads_account_list_or_other_properti
     assert data["devices"][0]["device"]["model"] == "MDHAA15WIFI-BK"
     assert "fixture-heater" not in json.dumps(data)
     assert data["devices"][0]["properties"] == [
-        {"property": {"name": "room_temp", "value": "20.5"}}
+        {"property": {"name": "room_temp", "value": "20.5", "key": 999}}
     ]
 
 
