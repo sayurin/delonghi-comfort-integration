@@ -67,8 +67,9 @@ Do not install this integration alongside another integration with the
 Download diagnostics from an account or device menu. Account diagnostics include
 all devices on the account; device diagnostics include only the selected device.
 Diagnostics do not control or register devices. Identifiers, credentials, and
-unrecognized text are excluded or redacted, but numeric telemetry and selected
-model/version text remain. Review the entire file before sharing it.
+API properties are included as returned by the service, including fields that
+may contain identifying or sensitive information. Review the entire file
+before sharing it.
 
 For help, open an
 [issue](https://github.com/sayurin/delonghi-comfort-integration/issues) with
